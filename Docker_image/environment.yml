@@ -1,0 +1,22 @@
+name: apegen
+channels:
+  - conda-forge
+  - salilab
+  - schrodinger
+  - bioconda
+dependencies:
+  - python=3.6
+  - pdbfixer
+  - numpy
+  - mdtraj
+  - openmm
+  - biopython
+  - modeller
+  - beautifulsoup4
+  - requests
+  - pymol
+  - biopandas
+  - mgltools
+  - openbabel
+  - prody 
+  - tabulate 
