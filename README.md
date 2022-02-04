@@ -44,6 +44,7 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 ### Main Workflow:
 
 #### Minor issues:
+- The `receptor_template_file` variable in Section 1b is questionable, investigate more
 - Manually overwrite `prepare_ligand4.py` with the changes that do not cause errors
 - Get debug message inside the print statements happening in the classes
 - Fix `initialize_dir` function to accept a list of directories and avoid calling the function multiple times
@@ -55,7 +56,6 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
-- Implement many rounds (currently not working properly)
 - Implement other inputs (native, HLA sequence, etc.)
 - Testing/Testing/Testing...
 
