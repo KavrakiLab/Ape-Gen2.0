@@ -20,7 +20,6 @@ class pMHC(object):
 
 	def align(self, reference, filestore):
 		initialize_dir(filestore + '/alignment_files')
-
 		#pymol.pymol_argv = ['pymol','-c']
 		#pymol.finish_launching()
 		p1 = pymol2.PyMOL()
@@ -82,22 +81,24 @@ class pMHC(object):
 
 		# Store the anchors now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
-		reference.pdb_filename = filestore + '/input_to_RCD/anchors.pdb'
-		ppdb_peptide.to_pdb(path=reference.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
+		anchor_pdb = filestore + '/input_to_RCD/anchors.pdb'
+		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
 
 		#Finally, merge those two to create the anchored MHC (peptide contains only the anchors)
 		anchored_MHC_file_name = filestore + '/input_to_RCD/anchored_pMHC.pdb'
-		merge_and_tidy_pdb([self.pdb_filename, reference.pdb_filename], anchored_MHC_file_name)
+		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
 		self.pdb_filename = anchored_MHC_file_name
 
 		# Before we go, we also have to store the N-terminus and the C-terminus of the peptide for the refinement
 		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == 1]
 		ppdb_peptide.df['ATOM'] = N_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/N_ter.pdb', records=['ATOM'], gz=False, append_newline=True)
+		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/N_ter.pdb', 
+							records=['ATOM'], gz=False, append_newline=True)
 
 		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == len(reference.peptide.sequence)]
 		ppdb_peptide.df['ATOM'] = C_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/C_ter.pdb', records=['ATOM'], gz=False, append_newline=True)
+		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/C_ter.pdb', 
+						    records=['ATOM'], gz=False, append_newline=True)
 
 		# DONE!
 

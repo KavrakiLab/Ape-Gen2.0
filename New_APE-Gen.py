@@ -125,17 +125,12 @@ def apegen(args):
 	if peptide_input.endswith(".pdb"):
 		# Fetch peptide sequence from .pdb and use that .pdb as a template
 		peptide = Peptide.frompdb(peptide_input)
-		peptide_template_file = peptide_input
 	else:
 		# Fetch template from peptide template list
 		peptide = Peptide.fromsequence(peptide_input)
-		peptide_templates = pd.read_csv("./template_files/n-mer-templates.csv")
-		sequence_length = len(re.sub('[a-z]', '', peptide.sequence)) # Remove PTMs when fetching the template
-		peptide_template_file = peptide_templates[peptide_templates['Pep_Length'] == sequence_length]['Template'].values[0]
-		peptide_template_file = './templates/' + peptide_template_file
 
-	# Peptide Template is a pMHC complex	
-	peptide_template = pMHC(pdb_filename = peptide_template_file, peptide = peptide) 
+	# Peptide Template is also a pMHC complex though	
+	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
 
 	# The reason that we calculate the PTMs list here and not in the Peptide class is because we need it to be a
 	# global variable to pass it on all peptide instances that need to be PTMed
@@ -162,7 +157,7 @@ def apegen(args):
 	elif receptor_class == "REDOCK":
 		# If REDOCK, the receptor template is the peptide template!
 		receptor = Receptor.fromredock(peptide_input)
-		receptor_template_file = peptide_template_file
+		receptor_template_file = peptide.pdb_filename
 	else:
 		# If this is an allotype specification, fetch template like the peptide!
 		receptor = Receptor.fromallotype(receptor_class)
@@ -259,6 +254,7 @@ def apegen(args):
 				print('No conformations were produced... Aborting...')
 				sys.exit(0)
 			print('No conformations were produced... Force restarting...')
+			# Need to be very sure here about my peptide/receptor template files
 		else:
 			# Storing the best conformation
 			best_energy = results_csv['Affinity'].astype('float').min()
@@ -273,7 +269,7 @@ def apegen(args):
 			# Decide where and how to pass the information for the next round
 			receptor_template.pdb_filename = filestore + '/min_energy_system.pdb'
 			if pass_type == 'pep_and_recept': peptide_template.pdb_filename = filestore + '/min_energy_system.pdb'
-
+			
 	# Ending and final statistics
 	print("\n\nEnd of APE-Gen !!!")
 	create_csv_from_list_of_files(temp_files_storage + '/APE_gen_best_run_results.csv', 

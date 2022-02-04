@@ -1,7 +1,11 @@
+from helper_scripts.Ape_gen_macros import merge_and_tidy_pdb
+
+from biopandas.pdb import PandasPdb
 import pandas as pd
-import sys
 
 from subprocess import call
+import sys
+import os
 
 class Receptor(object):
 
@@ -64,4 +68,17 @@ class Receptor(object):
 		
 		self.pdbqt_filename = filestore + "/SMINA_data/receptor_for_smina.pdbqt"
 		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A bond_hydrogens -U nphs > " + filestore + "/SMINA_data/prepare_receptor4.log 2>&1"], shell=True)
-		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/SMINA_data/receptor_for_smina.pdb > " + filestore + "/SMINA_data/pdbqt_to_pdb.log 2>&1"], shell=True)
+		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/SMINA_data/receptor_for_smina_temp.pdb > " + filestore + "/SMINA_data/pdbqt_to_pdb.log 2>&1"], shell=True)
+
+		# Before we continue here, an issue seems to arise. pdbqt_to_pdb.py introduces some segment identifiers that need to be removed?
+		self.pdb_filename = filestore + "/SMINA_data/receptor_for_smina_temp.pdb"
+		ppdb_receptor = PandasPdb()
+		ppdb_receptor.read_pdb(self.pdb_filename)
+		pdb_df_receptor = ppdb_receptor.df['ATOM']
+		ppdb_receptor.df['ATOM']['segment_id'] = ''
+		ppdb_receptor.to_pdb(path=self.pdb_filename, records=None, gz=False, append_newline=True)
+
+		## Adding the following lines to properly have TER and END fields (hence the temp file here, maybe there's a better way to do this)
+		self.pdb_filename = filestore + "/SMINA_data/receptor_for_smina.pdb"
+		merge_and_tidy_pdb([filestore + "/SMINA_data/receptor_for_smina_temp.pdb"], self.pdb_filename)
+		os.remove(filestore + "/SMINA_data/receptor_for_smina_temp.pdb")

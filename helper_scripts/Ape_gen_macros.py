@@ -86,7 +86,7 @@ def create_csv_from_list_of_files(csv_filename, list_of_files):
 def pretty_print_analytics(csv_location):
 
 	results_csv = pd.read_csv(csv_location, names=['Round', 'Peptide index', 'Debug', 'Affinity'])
-	results_csv.sort_values(by='Peptide index', inplace = True)
+	results_csv.sort_values(by=['Round', 'Peptide index'], inplace = True)
 	results_csv.to_csv(csv_location, index=False)
 
 	results_csv = results_csv[results_csv['Affinity'] != '-']
