@@ -80,8 +80,8 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 
 ### OpenMM:
 
-- Re-writing OpenMM and improve the code
-- Implement PTMs in the OpenMM step (see phosphorylation example that is working)
+- Re-writing OpenMM and improve the code (in progress)
+- Implement PTMs in the OpenMM step (see phosphorylation example that is working on the old version)
 - Update forcefield parameters for PTMs with the one released this year from Mackerel's group
 	- https://www.charmm.org/charmm/resources/charmm-force-fields/
 	- https://github.com/openmm/openmmforcefields/tree/master/charmm#Converting
