@@ -7,6 +7,10 @@ from subprocess import call
 import sys
 import os
 
+# PDBFIXER
+from pdbfixer import PDBFixer
+from openmm.app import PDBFile
+
 class Receptor(object):
 
 	def __init__(self, allotype, pdb_filename):
@@ -61,13 +65,23 @@ class Receptor(object):
 		flexible_residues = file.readline().strip()
 		return flexible_residues
 
+	def add_sidechains(self, filestore):
+		fixer = PDBFixer(filename=self.pdb_filename)
+		fixer.findMissingResidues()
+		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
+		fixer.findMissingAtoms()
+		fixer.addMissingAtoms()
+		fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
+		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
+
 	def prepare_for_scoring(self, filestore):
 
 		prep_receptor_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 		pdbqt_to_pdb_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
 		
 		self.pdbqt_filename = filestore + "/SMINA_data/receptor_for_smina.pdbqt"
-		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A bond_hydrogens -U nphs > " + filestore + "/SMINA_data/prepare_receptor4.log 2>&1"], shell=True)
+		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U lps > " + filestore + "/SMINA_data/prepare_receptor4.log 2>&1"], shell=True)
 		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/SMINA_data/receptor_for_smina_temp.pdb > " + filestore + "/SMINA_data/pdbqt_to_pdb.log 2>&1"], shell=True)
 
 		# Before we continue here, an issue seems to arise. pdbqt_to_pdb.py introduces some segment identifiers that need to be removed?
@@ -78,7 +92,7 @@ class Receptor(object):
 		ppdb_receptor.df['ATOM']['segment_id'] = ''
 		ppdb_receptor.to_pdb(path=self.pdb_filename, records=None, gz=False, append_newline=True)
 
-		## Adding the following lines to properly have TER and END fields (hence the temp file here, maybe there's a better way to do this)
+		# Adding the following lines to properly have TER and END fields (hence the temp file here, maybe there's a better way to do this)
 		self.pdb_filename = filestore + "/SMINA_data/receptor_for_smina.pdb"
 		merge_and_tidy_pdb([filestore + "/SMINA_data/receptor_for_smina_temp.pdb"], self.pdb_filename)
 		os.remove(filestore + "/SMINA_data/receptor_for_smina_temp.pdb")

@@ -6,7 +6,7 @@ import sys
 import os
 import re
 
-from helper_scripts.Ape_gen_macros import all_three_to_one_letter_codes, move_batch_of_files, move_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb
+from helper_scripts.Ape_gen_macros import all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -14,7 +14,7 @@ from openmm.app import PDBFile
 
 from subprocess import call
 
-from pdbtools import pdb_tofasta, pdb_rplchain
+from pdbtools import pdb_tofasta, pdb_delelem
 
 class Peptide(object):
 
@@ -55,37 +55,64 @@ class Peptide(object):
 		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
 		fixer.findMissingAtoms()
 		fixer.addMissingAtoms()
-		#fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+		fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
 		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
-		self.pdb_filename = filestore + '/SMINA_data/PTMed_peptides/PTMed_' + str(peptide_index) + '.pdb'
+		self.pdb_filename = filestore + '/SMINA_data/add_sidechains/PTMed_' + str(peptide_index) + '.pdb'
 		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
+
+		# So my hypothesis now here is that Modeller that is being used to add hydrogens, has a specification
+		# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
+		# Let's delete those entries and see how this goes:
+		# UPDATE: It's probably not this, uncomment if necessary
+		delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
+		overwritten = ''.join(delete_modeller_hydrogens)
+		with open(self.pdb_filename, 'w') as PTMed_file:
+			PTMed_file.write(overwritten)
+
+		# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
+		copy_file(filestore + '/SMINA_data/add_sidechains/PTMed_' + str(peptide_index) + '.pdb', 
+							filestore + '/SMINA_data/PTMed_peptides/PTMed_' + str(peptide_index) + '.pdb')
 
 	def perform_PTM(self, filestore, peptide_index, PTM_list):
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
 		# Maybe one day...
 		log_file = filestore + '/SMINA_data/PTMed_peptides/PTM.log'
+		self.pdb_filename = filestore + "/SMINA_data/PTMed_peptides/PTMed_" + str(peptide_index) + ".pdb"
 		for ptm in PTM_list:
 			PTM, selection = ptm.split(' ', 1)
 			call(["pymol -qc ./pymol_scripts/" + PTM + ".pml -- " + self.pdb_filename + " " + selection + " " + self.pdb_filename + " > " + log_file + " 2>&1"], shell=True)
 
-		# For some reason, after this step, I get peptide .pdb files with chain A.
-		# I want to make it into chains C as before:
+		# For some reason, after this step, I get peptide .pdb files with:
+
+		# A. Chain A. I want to make it into chains C as before
 		rechained = replace_chains(self.pdb_filename, "A", "C")
 		overwritten = ''.join(rechained)
 		with open(self.pdb_filename, 'w') as PTMed_file:
 			PTMed_file.write(overwritten)
 
+		# B. A bunch of weird H01 pymol hydrogens that I want to delete
+		delete_pymol_residues = delete_elements(self.pdb_filename, ["H01"])
+		overwritten_2 = ''.join(delete_pymol_residues)
+		with open(self.pdb_filename, 'w') as PTMed_file:
+			PTMed_file.write(overwritten_2)
+
+		# C. I need to re-organize atom indexes, which are a proper mess
+		PTMed_tidied = filestore + "/SMINA_data/PTMed_peptides/PTMed_" + str(peptide_index) + "tidied.pdb"
+		merge_and_tidy_pdb([self.pdb_filename], PTMed_tidied)
+		copy_file(PTMed_tidied, self.pdb_filename)
+		os.remove(PTMed_tidied)
+
 	def prepare_for_scoring(self, filestore, peptide_index, current_round):
 
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/SMINA_data/pdbqt_peptides/peptide_" + str(peptide_index) + ".pdbqt"
-		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A bond_hydrogens -Z -U nphs > " + filestore + "/SMINA_data/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
+		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U lps > " + filestore + "/SMINA_data/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
 
 		# If the resulting .pdbqt is faulty, delete it
 		seq = pdb_tofasta.run(open(self.pdbqt_filename, 'r'), multi=False)
 		seq = ''.join(seq).split("\n")[1]
 		if(len(seq) != len(self.sequence)):
-			os.remove(self.pdbqt_filename)
+			#os.remove(self.pdbqt_filename)
 			with open(filestore + "/SMINA_data/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
@@ -148,8 +175,12 @@ class Peptide(object):
 			# delete the minimized receptor coming from SMINA
 			if(receptor.doMinimization): os.remove(filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
 			
+			# Keep a log for the anchor difference
+			with open(filestore + "/SMINA_data/Anchor_filtering/peptide_" + str(peptide_index) + ".log", 'a+') as anchor_log:
+				anchor_log.write(str(current_round) + "," + str(peptide_index) + "," + str(anchor_difference[0]) + "," + str(anchor_difference[1]) + "," + str(anchor_difference[2]) + "," + str(anchor_difference[3])) 
+			
 			# Keep this result for final printing
-			faulty_positions = (anchor_difference < anchor_tol)*anchors
+			faulty_positions = (anchor_difference > anchor_tol)*anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
 			with open(filestore + "/SMINA_data/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
@@ -175,7 +206,7 @@ class Peptide(object):
 				  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
 
 		# Unify peptide and receptor together
-		pMHC_complex = filestore + "/Final_conformations/pMHC_" + str(peptide_index) + ".pdb"
+		pMHC_complex = filestore + "/SMINA_data/pMHC_complexes/pMHC_" + str(peptide_index) + ".pdb"
 		merge_and_tidy_pdb([minimized_receptor_loc, self.pdb_filename], pMHC_complex)
 		removed = remove_remarks_and_others_from_pdb(pMHC_complex)
 		overwritten = ''.join(removed)

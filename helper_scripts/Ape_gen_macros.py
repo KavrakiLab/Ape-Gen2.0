@@ -40,15 +40,20 @@ def initialize_dir(dirname):
 	os.makedirs(dirname)
 
 def copy_file(src, dst):
-	shutil.move(src, dst)
+	shutil.copy(src, dst)
 
 def move_file(src, dst):
 	shutil.move(src, dst)
 
-def move_batch_of_files(src, dst, query=None):
+def move_batch_of_files(src, dst, query):
 	files = os.listdir(src)
 	for f in files:
 		if (query in f): shutil.move(src + f, dst)
+
+def copy_batch_of_files(src, dst, query):
+	files = os.listdir(src)
+	for f in files:
+		if (query in f): shutil.copy(src + f, dst)
 
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
@@ -77,6 +82,16 @@ def replace_chains(pdb_file, chain_from, chain_to):
 		yield line
 	fhandle.close()
 
+def delete_elements(pdb_file, element_set):
+	records = ('ATOM', 'HETATM', 'ANISOU')
+	fhandle = open(pdb_file, 'r')
+	for line in fhandle:
+		if line.startswith(records):
+			if line[13:16].strip() in element_set:
+				continue
+		yield line
+	fhandle.close()
+       
 def create_csv_from_list_of_files(csv_filename, list_of_files):
 	with open(csv_filename, 'wb') as outfile:
 		for filename in list_of_files:

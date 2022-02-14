@@ -44,6 +44,8 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 ### Main Workflow:
 
 #### Minor issues:
+- Implement `PDBFixer` steps in a better way (it's the same function in all of the 3 classes basically)
+- Make `os.remove` calls a shutil function
 - The `receptor_template_file` variable in Section 1b is questionable, investigate more
 - Manually overwrite `prepare_ligand4.py` with the changes that do not cause errors
 - Get debug message inside the print statements happening in the classes
@@ -51,11 +53,13 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 - Consider peptide methods which receptor is an input to be transferred to the `pMHC_class`, and a pMHC object defined
 - `peptide_index` in methods is annoying, maybe replace it with a new field
 - `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
-- See if you can fix the script that replaces the flexible residues to the receptor (`ProDy` installation could be avoided)
 - Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
+- RCD for some peptides (even theoretical binders) returning constanty unclosed loops... Upon further inspection, it seems that the issue resides in the incomplete bonds that don't connect the entirety of the aminoacid. Bring the discussion again as to whether this should remain as a feature, or something that should formally be addressed by giving the user the opportunity to set up a threshold (see Shrodinger's lab Jaguar, the use a `covfac` variable).
+- Bring the discussion about the pyRosetta optimization in the RCD step, and whether this should be asked from the authors of the paper.
+- See if you can fix the script that replaces the flexible residues to the receptor (`ProDy` installation could be avoided). -> Alternative: Call again pdbfixer ONLY to the receptor.   
 - Implement other inputs (native, HLA sequence, etc.)
 - Testing/Testing/Testing...
 

@@ -1,5 +1,5 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics
+from helper_scripts.Ape_gen_macros import initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -11,18 +11,17 @@ import re
 
 import sys
 from mpire import WorkerPool
+from tqdm import tqdm
 
 # Temporary
 from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
+from time import sleep
 
 def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
-
-	err_list = [] # List that keeps track of what happened in each step and prints everything in a file
-	res_list = [] # List that will return the results for final printing
 
 	# 1. Assemble peptide by mergin the peptide anchors and the middle part
 	model_location = filestore + '/RCD_data/splits/model_' + str(peptide_index) + '.pdb'
@@ -31,6 +30,9 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	assembled_peptide = filestore + '/SMINA_data/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 	peptide = Peptide.frompdb(assembled_peptide)
+
+	#peptide_is_not_valid = peptide.prepare_for_scoring(filestore, peptide_index, current_round)
+	#if(peptide_is_not_valid): return
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.add_sidechains(filestore, peptide_index)
@@ -176,8 +178,8 @@ def apegen(args):
 		print("Receptor Template: " + receptor_template.pdb_filename)
 
 	# 2. MAIN LOOP
-
-	for current_round in range(1, num_rounds + 1): 
+	current_round = 1
+	while current_round < num_rounds + 1: 
 
 		# File storage location for the current round
 		print("\n\nStarting round " + str(current_round) + " !!!!\n")
@@ -189,8 +191,8 @@ def apegen(args):
 		if debug: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference = peptide_template, filestore = filestore)
 		if debug: print("Preparing input to RCD")
-		# Specify anchors
 		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore, pep_seq = peptide.sequence)
+		receptor_template.add_sidechains(filestore = filestore)
 
 		# Perform RCD on the receptor given peptide:
 		if debug: print("Performing RCD")
@@ -200,6 +202,7 @@ def apegen(args):
 		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/SMINA_data')
 		receptor = receptor_template.receptor
+		receptor.add_sidechains(filestore)
 		receptor.prepare_for_scoring(filestore)
 
 		# Get peptide template anchor positions for anchor tolerance filtering
@@ -213,17 +216,20 @@ def apegen(args):
 		initialize_dir(filestore + '/SMINA_data/assembled_peptides') # Need to make initialize_dirs accepting a list
 		initialize_dir(filestore + '/SMINA_data/per_peptide_results')
 		initialize_dir(filestore + '/SMINA_data/PTMed_peptides')
+		initialize_dir(filestore + '/SMINA_data/add_sidechains')
 		initialize_dir(filestore + '/SMINA_data/pdbqt_peptides') 
 		initialize_dir(filestore + '/SMINA_data/Scoring_results')
 		initialize_dir(filestore + '/SMINA_data/flexible_receptors')
 		initialize_dir(filestore + '/SMINA_data/minimized_receptors')
 		initialize_dir(filestore + '/SMINA_data/Anchor_filtering')
-		initialize_dir(filestore + '/Final_conformations/')
+		initialize_dir(filestore + '/SMINA_data/pMHC_complexes/')
 
 		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
+
+		initialize_dir(filestore + '/Final_conformations/')
 
 		# Working Code for enbsembling individual .pdbs (might come in handy later!)
 
@@ -244,6 +250,28 @@ def apegen(args):
 		results_csv = pretty_print_analytics(filestore + '/total_results.csv')
 		results_csv.to_csv(filestore + '/successful_conformations_statistics.csv')
 
+		# OpenMM step. It seems to be parallel on its own, so no need to put it in a loop (but also inverstigate more?)		
+		# A) Use nested for loops, as for every remaining conformation, we do *N* different OpenMM tries
+		# B) Re-print results after the OpenMM step (include SMINA but also energies calculated from OpenMM?)
+		if score_with_openmm:
+			initialize_dir(filestore + '/OpenMM_confs')
+			for pMHC_conformation in tqdm(glob.glob(filestore + '/SMINA_data/pMHC_complexes/*.pdb'), desc="pMHC conf",
+										  position = 0):
+				numTries = 10
+				best_energy = 0
+				pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
+												leave=False):
+					pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+					best_energy = pMHC_complex.minimizeConf(device, best_energy)
+			copy_batch_of_files(filestore + '/OpenMM_confs/', 
+								filestore + '/Final_conformations/',
+								query="pMHC_")
+		else:
+			copy_batch_of_files(filestore + '/SMINA_data/pMHC_complexes/', 
+								filestore + '/Final_conformations',
+								query="pMHC_")
+
 		# Control whether there are no conformations. If they do, store the best one and continue.
 		# If not, either abort or force restart (for round one)
 		if(results_csv.shape[0] == 0 and current_round > 1):
@@ -254,14 +282,13 @@ def apegen(args):
 				print('No conformations were produced... Aborting...')
 				sys.exit(0)
 			print('No conformations were produced... Force restarting...')
-			# Need to be very sure here about my peptide/receptor template files
 		else:
 			# Storing the best conformation
 			best_energy = results_csv['Affinity'].astype('float').min()
 			best_conformation = results_csv[results_csv['Affinity'].astype('float') == best_energy]
 			best_conformation_index = best_conformation['Peptide index'].values[0]
 			print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
-			copy_file(filestore + '/Final_conformations/pMHC_' + str(best_conformation_index) + '.pdb',
+			copy_file(filestore + '//SMINA_data/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
 				  	  filestore + '/min_energy_system.pdb')
 			copy_file(filestore + '/SMINA_data/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
 				  	  filestore + '/min_energy.log')
@@ -269,6 +296,9 @@ def apegen(args):
 			# Decide where and how to pass the information for the next round
 			receptor_template.pdb_filename = filestore + '/min_energy_system.pdb'
 			if pass_type == 'pep_and_recept': peptide_template.pdb_filename = filestore + '/min_energy_system.pdb'
+
+			# Finally, advance to the next round!
+			current_round += 1
 			
 	# Ending and final statistics
 	print("\n\nEnd of APE-Gen !!!")

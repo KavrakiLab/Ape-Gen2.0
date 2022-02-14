@@ -20,7 +20,6 @@ def APE_Gen_parser():
 	parser.add_argument("-b", "--pass_type", type=str, default='receptor_only', choices=['receptor_only', 'pep_and_recept'], help="When using multiple rounds, pass best scoring conformation across different rounds (choose either 'receptor_only' or 'pep_and_recept')")
 	parser.add_argument("-s", "--min_with_smina", action="store_true", help='Minimize with SMINA instead of the default Vinardo')
 	parser.add_argument("--use_gpu", action="store_true", help='Use GPU for OpenMM Minimization step')
-	parser.add_argument("--no_progress", action="store_true", help='Do not print progress bar')
 	parser.add_argument("--clean_rcd", action="store_true", help='Remove RCD folder at the end of each round')
 	parser.add_argument("--dir", type=str, default='intermediate_files', help='Location for all the intermediate files')
 	parser.add_argument("--force_restart", action="store_true", help='Force restart of APE-Gen *ONLY* in the first round and *ONLY* if no conformations are produced')
