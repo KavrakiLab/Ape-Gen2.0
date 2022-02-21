@@ -57,9 +57,7 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
-- RCD for some peptides (even theoretical binders) returning constanty unclosed loops... Upon further inspection, it seems that the issue resides in the incomplete bonds that don't connect the entirety of the aminoacid. Bring the discussion again as to whether this should remain as a feature, or something that should formally be addressed by giving the user the opportunity to set up a threshold (see Shrodinger's lab Jaguar, the use a `covfac` variable).
-- Bring the discussion about the pyRosetta optimization in the RCD step, and whether this should be asked from the authors of the paper.
-- See if you can fix the script that replaces the flexible residues to the receptor (`ProDy` installation could be avoided). -> Alternative: Call again pdbfixer ONLY to the receptor.   
+- See if you can fix the script that replaces the flexible residues to the receptor (`ProDy` installation could be avoided). -> UPDATE: This needs fixing, GNINA script is not working properly, and Jayvee's old code is not either for many reasons. A routing NEEDS to be build that updates probably based on the CONNECT fields and solving a CSP for each atom.   
 - Implement other inputs (native, HLA sequence, etc.)
 - Testing/Testing/Testing...
 
