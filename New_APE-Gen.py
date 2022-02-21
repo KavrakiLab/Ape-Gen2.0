@@ -40,6 +40,10 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	# 3. Do PTMs
 	peptide.perform_PTM(filestore, peptide_index, PTM_list)
 
+	# Intermediate OpenMM step that fixes things maybe?
+	#peptide.minimizeConf(filestore, peptide_index)
+	#input()
+
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
 	peptide_is_not_valid = peptide.prepare_for_scoring(filestore, peptide_index, current_round)
@@ -106,9 +110,6 @@ def apegen(args):
 
 	# - use_gpu for Open_MM_minimization step
 	device = "OpenCL" if args.use_gpu else "CPU"
-
-	# - No_progress: Do not print progress bar?
-	no_progress = not args.no_progress
 
 	# --clean_rcd: Remove RCD folder at the end of each round?
 	cleanRCD = args.clean_rcd
@@ -242,7 +243,7 @@ def apegen(args):
 
 		#for argument in arg_list:
 			#print(argument)
-			#peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5])
+		#	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6])
 
 		# Print and keep statistics
 		print("\n\nEnd of round no. " + str(current_round) + "!!!")

@@ -16,6 +16,8 @@ from subprocess import call
 
 from pdbtools import pdb_tofasta, pdb_delelem
 
+from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
+
 class Peptide(object):
 
 	def __init__(self, pdb_filename, sequence):
@@ -64,10 +66,10 @@ class Peptide(object):
 		# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
 		# Let's delete those entries and see how this goes:
 		# UPDATE: It's probably not this, uncomment if necessary
-		delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
-		overwritten = ''.join(delete_modeller_hydrogens)
-		with open(self.pdb_filename, 'w') as PTMed_file:
-			PTMed_file.write(overwritten)
+		#delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
+		#overwritten = ''.join(delete_modeller_hydrogens)
+		#with open(self.pdb_filename, 'w') as PTMed_file:
+		#	PTMed_file.write(overwritten)
 
 		# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
 		copy_file(filestore + '/SMINA_data/add_sidechains/PTMed_' + str(peptide_index) + '.pdb', 
@@ -102,11 +104,63 @@ class Peptide(object):
 		copy_file(PTMed_tidied, self.pdb_filename)
 		os.remove(PTMed_tidied)
 
+	def minimizeConf(self, filestore, peptide_index):
+
+		# Read PDB
+		pdb = PDBFile(self.pdb_filename)
+		top = pdb.getTopology()
+		positions = np.array(pdb.positions) 
+		numAtoms = len(positions)
+		positions = np.reshape(positions, (3*numAtoms,1))
+
+		# Create the ForceField
+		forcefield = ForceField('amber/ff14SB.xml', 'amber/phosaa14SB.xml')
+		modeller = Modeller(pdb.topology, pdb.positions)
+		system = forcefield.createSystem(modeller.topology, nonbondedMethod=CutoffNonPeriodic, constraints=None)
+
+		# Adding Forces?
+		force_constant = 5000
+		force = CustomExternalForce("k*periodicdistance(x, y, z, x0, y0, z0)^2")
+		force.addGlobalParameter("k", force_constant)
+		force.addPerParticleParameter("x0")
+		force.addPerParticleParameter("y0")
+		force.addPerParticleParameter("z0")
+		protein_particles = md.load(filename).top.select("backbone")
+		particle_indices = []
+		for protein_particle in protein_particles:
+			particle_indices.append(force.addParticle(int(protein_particle), modeller.positions[protein_particle]) )
+		system.addForce(force)
+
+		# Enumerate forces?
+		forces = system.getForces()
+		for i, f in enumerate(forces):
+			f.setForceGroup(i)
+
+		# Rest (Integrator + Platform)
+		integrator = LangevinIntegrator(300*kelvin, 1/picosecond, 0.002*picoseconds)
+		platform = Platform.getPlatformByName(device)
+
+		# Create Simulation
+		simulation = Simulation(modeller.topology, system, integrator, platform)
+		simulation.context.setPositions(modeller.positions)
+
+		# Minimize energy
+		simulation.minimizeEnergy()
+		simulation.reporters.append(app.StateDataReporter(stdout, 100, step=True, potentialEnergy=True, 
+    								temperature=True, progress=False, remainingTime=True, speed=True, 
+    								totalSteps=250000, separator='\t'))
+
+		# Write results to a new file if energy is small enough
+		energy = simulation.context.getState(getEnergy=True).getPotentialEnergy() / kilojoule_per_mole
+		if energy < 0:
+			r = PDBReporter(filestore + '/SMINA_data/OpenMM_confs/minimized_' + peptide_index, 1)
+			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
+
 	def prepare_for_scoring(self, filestore, peptide_index, current_round):
 
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/SMINA_data/pdbqt_peptides/peptide_" + str(peptide_index) + ".pdbqt"
-		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U lps > " + filestore + "/SMINA_data/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
+		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U lps -g -s > " + filestore + "/SMINA_data/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
 
 		# If the resulting .pdbqt is faulty, delete it
 		seq = pdb_tofasta.run(open(self.pdbqt_filename, 'r'), multi=False)
@@ -197,13 +251,58 @@ class Peptide(object):
 			peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Successfully Modeled," + str(affinity) + "\n")
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
+		#minimized_receptor_loc = filestore + "/SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
+		#if receptor.doMinimization:
+		#	call(["python ./helper_scripts/makeflex.py " + \
+		#		  filestore + "/SMINA_data/receptor_for_smina.pdb " + \
+		#		  filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
+		#		  minimized_receptor_loc],
+		#		  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
+
+		# Alternative scenario: Join 2 PDB files in a custom way, while keeping all the hydrogens intact!
+		# This is probably a little hacky, if I could do this using a join, that would have been amazing!
 		minimized_receptor_loc = filestore + "/SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
 		if receptor.doMinimization:
-			call(["python ./helper_scripts/makeflex.py " + \
-				  filestore + "/SMINA_data/receptor_for_smina.pdb " + \
-				  filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
-				  minimized_receptor_loc],
-				  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
+
+			# Load flexible receptor
+			flex_receptor = PandasPdb()
+			flex_receptor.read_pdb(filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
+			flex_receptor_df = flex_receptor.df['ATOM']
+
+			# Load rigid receptor
+			rigid_receptor = PandasPdb()
+			rigid_receptor.read_pdb(filestore + "/SMINA_data/receptor_for_smina.pdb")
+			rigid_receptor_df = rigid_receptor.df['ATOM']
+
+			flexible_residues_list = pd.unique(flex_receptor_df['residue_number']).tolist() # Alternative: Load those from object?
+
+			for residue in flexible_residues_list:
+
+				flexible_residue = flex_receptor_df[flex_receptor_df['residue_number'] == residue]
+
+				# Create another dataframe with the ATOM names altered:
+				rigid_receptor_altered = rigid_receptor_df[rigid_receptor_df['residue_number'] == residue]
+				#rigid_receptor_altered['atom_name'] = rigid_receptor_altered['atom_name'].str[0]
+
+				altered_receptor_index = 0
+
+				for index, flexible_row in flexible_residue.iterrows():
+
+					new_x_coord = flexible_row['x_coord']
+					new_y_coord = flexible_row['y_coord']
+					new_z_coord = flexible_row['z_coord']
+
+					altered_entry_found = False
+					while not altered_entry_found:
+						altered_receptor_index += 1
+						altered_atom_name = rigid_receptor_altered.iloc(altered_receptor_index, rigid_receptor_altered.columns.get_loc('element_symbol'))
+						altered_atom_number = rigid_receptor_altered.iloc(altered_receptor_index, rigid_receptor_altered.columns.get_loc('atom_number'))
+						if flexible_row['atom_name'] == altered_atom_name:
+							rigid_receptor_df.loc[rigid_receptor_df['atom_number'] == altered_atom_number, 'x_coord'] = new_x_coord
+							rigid_receptor_df.loc[rigid_receptor_df['atom_number'] == altered_atom_number, 'y_coord'] = new_y_coord
+							rigid_receptor_df.loc[rigid_receptor_df['atom_number'] == altered_atom_number, 'z_coord'] = new_z_coord
+							altered_entry_found = True
+							break
 
 		# Unify peptide and receptor together
 		pMHC_complex = filestore + "/SMINA_data/pMHC_complexes/pMHC_" + str(peptide_index) + ".pdb"
