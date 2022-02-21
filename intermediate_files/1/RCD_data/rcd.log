@@ -1,0 +1,85 @@
+---------------------------------
+USED PARAMETERS:
+---------------------------------
+	 COMMAND-LINE: rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d 1.0 -n 100 intermediate_files/1/input_to_RCD/loops.txt 
+	 n: 100
+	 max_path: 5000
+	 path_slope: 1000.000000
+	 t: 0.980000
+	 s: 3
+	 c: 3
+	 d: 1.000000
+	 rmsd_thr: 9999.000000
+	 pass_factor: 10000.000000
+	 kick_factor: 0.300000
+	 kick_thr: 0.001000
+	 kick_cut: 0.350000
+	 softness: 0.900000
+	 bump_filter: 0
+	 bump_rate: 1.000000
+	 presampling: 200
+	 factor_clashes: 1.000000
+	 factor_co: 2.890000
+	 factor_ocb: 2.250000
+	 enable_kick: 1
+	 inside_rand: 1
+	 exact_rama: 1
+	 emodel: 1
+	 loco_best: 0
+	 loco_notbest: 0
+	 atomshift: 4
+---------------------------------
+rcd> Loop present in PDB.
+rcd> Sequence from PDB: seq= TFDEVFY
+rcd> Loop present in PDB but using custom sequence from Input: FDEVF
+rcd> Loop 2-8 including anchors (sequence: TFDEVFY, 100 loops requested)
+> loop 5 aminoacids sequence: TFDEVFY
+NtC= 3.501000 12.536000 14.439000
+rcd> FirstPhi= -1.419151 (-81.311391)  LastPsi= 2.377295 (136.208986)
+rcd> Remark: Nt-Oxigen optimization is disabled, considering FirstPsi= 2.695648 (154.449271)
+Standard dihedral_angle:
+  2.377  0.000 -1.419  2.696  3.126  0.000  0.000  3.126  0.000  0.000  3.126  0.000  0.000  3.126  0.000  0.000  3.126  0.000  0.000  3.126  0.000
+rcd> RMSD native-generated BB  11.0328 O  12.6784
+rcd> Warning: Intra-clash in PDB intermediate_files/1/input_to_RCD/anchored_pMHC.pdb loop
+rcd> Warning: Intra-clash in regenerated intermediate_files/1/input_to_RCD/anchored_pMHC.pdb loop
+rcd> Remark: Phi angle in Nt-anchor (-81.311391) has 47 valid Psi angles.
+rcd> Remark: Psi angle in Ct-anchor (136.208986) has 29 valid Phi angles.
+rcd> Reading input file
+rcd>  1 intermediate_files/1/input_to_RCD/anchored_pMHC.pdb        3        7 C FDEVF (5)
+rcd> Current max_path= 6000
+rcd>
+rcd>________________________________________________________________________________
+rcd>
+rcd> Processing intermediate_files/1/input_to_RCD/anchored_pMHC.pdb                                                      1/1 
+rcd>
+imode> Deleting Hydrogen atoms (if any)...
+imode> Deleting Water molecules (if any)...
+rcd> Select chain C
+> Selecting non-mobile residues (ichain= 2), i.e. excluding residues from 3 to 7
+> Nt-1 anchor residue 2 (C chain) found in main PDB: 365 (internal index)
+> Ct+1 anchor residue 8 (C chain) found in main PDB: 366 (internal index)
+rcd> Loop coordinates present TFDEVFY
+rcd> Creating clash map with stepsize 0.250000
+rcd> Anchor Distance   18.498   14.523
+rcd> Box added distance   14.523
+rcd> Clashes map dimensions: 121 121 127 vol 122
+rcd> Loop closure  [>---------------------------------------]   2%rcd> Loop closure  [=>--------------------------------------]   4%rcd> Loop closure  [==>-------------------------------------]   6%rcd> Loop closure  [===>------------------------------------]   8%rcd> Loop closure  [====>-----------------------------------]  10%rcd> Loop closure  [====>-----------------------------------]  12%rcd> Loop closure  [=====>----------------------------------]  14%rcd> Loop closure  [======>---------------------------------]  16%rcd> Loop closure  [=======>--------------------------------]  18%rcd> Loop closure  [========>-------------------------------]  20%rcd> Loop closure  [========>-------------------------------]  22%rcd> Loop closure  [=========>------------------------------]  24%rcd> Loop closure  [==========>-----------------------------]  26%rcd> Loop closure  [===========>----------------------------]  28%rcd> Loop closure  [============>---------------------------]  30%rcd> Loop closure  [============>---------------------------]  32%rcd> Loop closure  [=============>--------------------------]  34%rcd> Loop closure  [==============>-------------------------]  36%rcd> Loop closure  [===============>------------------------]  38%rcd> Loop closure  [================>-----------------------]  40%rcd> Loop closure  [================>-----------------------]  42%rcd> Loop closure  [=================>----------------------]  44%rcd> Loop closure  [==================>---------------------]  46%rcd> Loop closure  [===================>--------------------]  48%rcd> Loop closure  [====================>-------------------]  50%rcd> Loop closure  [====================>-------------------]  52%rcd> Loop closure  [=====================>------------------]  54%rcd> Loop closure  [======================>-----------------]  56%rcd> Loop closure  [=======================>----------------]  58%rcd> Loop closure  [========================>---------------]  60%rcd> Loop closure  [========================>---------------]  62%rcd> Loop closure  [=========================>--------------]  64%rcd> Loop closure  [==========================>-------------]  66%rcd> Loop closure  [===========================>------------]  68%rcd> Loop closure  [============================>-----------]  70%rcd> Loop closure  [============================>-----------]  72%rcd> Loop closure  [=============================>----------]  74%rcd> Loop closure  [==============================>---------]  76%rcd> Loop closure  [===============================>--------]  78%rcd> Loop closure  [================================>-------]  80%rcd> Loop closure  [================================>-------]  82%rcd> Loop closure  [=================================>------]  84%rcd> Loop closure  [==================================>-----]  86%rcd> Loop closure  [===================================>----]  88%rcd> Loop closure  [====================================>---]  90%rcd> Loop closure  [====================================>---]  92%rcd> Loop closure  [=====================================>--]  94%rcd> Loop closure  [======================================>-]  96%rcd> Loop closure  [=======================================>]  98%rcd> Loop closure  [========================================>] 100% Finished!
+rcd> Writing dihedral angles file (Phi,Psi): ./intermediate_files/1/input_to_RCD/anchored_pMHC_dh.txt
+rcd> Writing valence angles file: ./intermediate_files/1/input_to_RCD/anchored_pMHC_val.txt
+rcd> Writing bond lengths file: ./intermediate_files/1/input_to_RCD/anchored_pMHC_len.txt
+rcd> Cycles 100  trials 100 F/R 47/53  map_clashes 774  rand_repairs 37  infinite= 0
+rcd> Fails 0  F/R 0/0  max_path 0  Total_self_clashes 0  Open/Closed_self_clashes 0/0
+rcd> n_rama_fail= 0   avg_rama_fail= 0
+rcd> Saving RMSD values
+rcd> Timings avg 103.290+/-91 	Max 609 	Min 17
+rcd> Counts  avg 94.890+/-105 	Max 706 	Min 2
+rcd> Rmsd    avg 0.000+/-0.000 	Max 0.000 	Min 0.000
+rcd> Energy  avg 0.000+/-0.000 	Max 0.000 	Min 0.000
+rcd> Score avg -157.515+/-19.877 	Max -116.318 	Min -206.259
+rcd> Post-rama-check -> Failed-post-rama-loops: 0
+rcd> Final solutions -> Trials (totalk): 100 
+rcd> Solutions/trials 100/100 ratio 1.000   F/B 0.47/0.53 0.47/0.53 0.47/0.53 0.50/0.50
+rcd> Solutions with clashes remaining 0 ratio 0.00
+rcd> Saved files in .
+rcd> RCD execution completed
+rcd>

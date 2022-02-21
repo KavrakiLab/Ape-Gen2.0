@@ -1,0 +1,205 @@
+REMARK  0 active torsions:
+REMARK  status: ('A' for Active; 'I' for Inactive)
+REMARK       I    between atoms: N_1  and  CA_5 
+REMARK       I    between atoms: CA_5  and  C_7 
+REMARK       I    between atoms: CA_5  and  CB_9 
+REMARK       I    between atoms: C_7  and  N_14 
+REMARK       I    between atoms: CB_9  and  OG_12 
+REMARK       I    between atoms: N_14  and  CA_16 
+REMARK       I    between atoms: CA_16  and  CB_20 
+REMARK       I    between atoms: CA_16  and  C_18 
+REMARK       I    between atoms: C_18  and  N_28 
+REMARK       I    between atoms: CB_20  and  OG1_26 
+REMARK       I    between atoms: CB_20  and  CG2_22 
+REMARK       I    between atoms: N_28  and  CA_30 
+REMARK       I    between atoms: CA_30  and  CB_34 
+REMARK       I    between atoms: CA_30  and  C_32 
+REMARK       I    between atoms: CB_34  and  CG_37 
+REMARK       I    between atoms: CA_50  and  C_52 
+REMARK       I    between atoms: C_52  and  N_60 
+REMARK       I    between atoms: N_60  and  CA_62 
+REMARK       I    between atoms: CA_62  and  C_64 
+REMARK       I    between atoms: CA_62  and  CB_66 
+REMARK       I    between atoms: C_64  and  N_75 
+REMARK       I    between atoms: CB_66  and  CG_69 
+REMARK       I    between atoms: CG_69  and  CD_72 
+REMARK       I    between atoms: N_75  and  CA_77 
+REMARK       I    between atoms: CA_77  and  CB_81 
+REMARK       I    between atoms: CA_77  and  C_79 
+REMARK       I    between atoms: C_79  and  N_91 
+REMARK       I    between atoms: CB_81  and  CG1_83 
+REMARK       I    between atoms: CB_81  and  CG2_87 
+REMARK       I    between atoms: N_91  and  CA_93 
+REMARK       I    between atoms: CA_93  and  CB_97 
+REMARK       I    between atoms: CA_93  and  C_95 
+REMARK       I    between atoms: C_95  and  N_111 
+REMARK       I    between atoms: CB_97  and  CG_100 
+REMARK       I    between atoms: N_111  and  CA_113 
+REMARK       I    between atoms: CA_113  and  C_115 
+REMARK       I    between atoms: CA_113  and  CB_117 
+REMARK       I    between atoms: CB_117  and  CG_120 
+REMARK       I    between atoms: CZ_125  and  OH_126 
+REMARK       I    between atoms: N_132  and  CA_134 
+REMARK       I    between atoms: CA_134  and  C_136 
+REMARK       I    between atoms: CA_134  and  CB_138 
+REMARK       I    between atoms: CB_138  and  CG_141 
+REMARK       I    between atoms: CG_141  and  CD_144 
+REMARK       I    between atoms: CD_144  and  CE_147 
+REMARK       I    between atoms: CE_147  and  NZ_150 
+ROOT
+ATOM      1  N   SER C   1       3.569  10.245  15.174  1.00  0.00    -0.064 N 
+ATOM      2  H   SER C   1       3.363   9.928  14.035  1.00  0.00     0.275 HD
+ATOM      3  H2  SER C   1       3.076   9.326  15.767  1.00  0.00     0.275 HD
+ATOM      4  H3  SER C   1       4.745  10.129  15.343  1.00  0.00     0.275 HD
+ATOM      5  CA  SER C   1       3.063  11.615  15.582  1.00  0.00     0.195 C 
+ATOM      6  HA  SER C   1       1.907  11.455  15.829  1.00  0.00     0.102 H 
+ATOM      7  C   SER C   1       3.501  12.536  14.439  1.00  0.00     0.251 C 
+ATOM      8  O   SER C   1       4.647  12.524  13.986  1.00  0.00    -0.271 OA
+ATOM      9  CB  SER C   1       3.799  12.126  16.857  1.00  0.00     0.051 C 
+ATOM     10  HB2 SER C   1       3.442  13.215  17.207  1.00  0.00     0.077 H 
+ATOM     11  HB3 SER C   1       4.989  12.196  16.789  1.00  0.00     0.077 H 
+ATOM     12  OG  SER C   1       3.436  11.360  17.999  1.00  0.00    -0.398 OA
+ATOM     13  HG  SER C   1       4.133  11.647  18.916  1.00  0.00     0.209 HD
+ATOM     14  N   THR C   2       2.645  13.462  14.123  1.00  0.00    -0.344 N 
+ATOM     15  H   THR C   2       1.815  13.745  14.925  1.00  0.00     0.163 HD
+ATOM     16  CA  THR C   2       2.846  14.378  12.987  1.00  0.00     0.113 C 
+ATOM     17  HA  THR C   2       3.174  13.623  12.123  1.00  0.00     0.091 H 
+ATOM     18  C   THR C   2       3.766  15.521  13.358  1.00  0.00     0.243 C 
+ATOM     19  O   THR C   2       3.873  15.884  14.534  1.00  0.00    -0.271 OA
+ATOM     20  CB  THR C   2       1.511  14.974  12.535  1.00  0.00     0.060 C 
+ATOM     21  HB  THR C   2       0.649  14.235  12.926  1.00  0.00     0.086 H 
+ATOM     22  CG2 THR C   2       1.107  16.303  13.198  1.00  0.00    -0.050 C 
+ATOM     23 1HG2 THR C   2       1.664  17.333  12.973  1.00  0.00     0.031 H 
+ATOM     24 2HG2 THR C   2       0.894  16.296  14.378  1.00  0.00     0.031 H 
+ATOM     25 3HG2 THR C   2       0.006  16.528  12.775  1.00  0.00     0.031 H 
+ATOM     26  OG1 THR C   2       1.004  14.711  11.243  1.00  0.00    -0.393 OA
+ATOM     27  HG1 THR C   2       1.594  15.349  10.439  1.00  0.00     0.210 HD
+ATOM     28  N   PHE C   3       4.439  16.099  12.364  1.00  0.00    -0.347 N 
+ATOM     29  H   PHE C   3       4.604  15.429  11.395  1.00  0.00     0.163 HD
+ATOM     30  CA  PHE C   3       5.339  17.221  12.598  1.00  0.00     0.080 C 
+ATOM     31  HA  PHE C   3       5.770  17.237  13.710  1.00  0.00     0.086 H 
+ATOM     32  C   PHE C   3       4.616  18.545  12.388  1.00  0.00     0.175 C 
+ATOM     33  O   PHE C   3       4.668  19.432  13.247  1.00  0.00    -0.173 OA
+ATOM     34  CB  PHE C   3       6.528  17.166  11.637  1.00  0.00    -0.018 C 
+ATOM     35  HB2 PHE C   3       6.996  16.074  11.795  1.00  0.00     0.043 H 
+ATOM     36  HB3 PHE C   3       6.327  17.126  10.460  1.00  0.00     0.043 H 
+ATOM     37  CG  PHE C   3       7.819  17.921  11.853  1.00  0.00    -0.072 A 
+ATOM     38  CD1 PHE C   3       8.654  17.711  12.975  1.00  0.00    -0.080 A 
+ATOM     39  HD1 PHE C   3       8.803  16.702  13.584  1.00  0.00     0.083 H 
+ATOM     40  CE1 PHE C   3       9.665  18.622  13.342  1.00  0.00    -0.086 A 
+ATOM     41  HE1 PHE C   3      10.523  18.371  14.124  1.00  0.00     0.083 H 
+ATOM     42  CZ  PHE C   3       9.687  19.855  12.678  1.00  0.00    -0.098 A 
+ATOM     43  HZ  PHE C   3      10.159  20.754  13.295  1.00  0.00     0.077 H 
+ATOM     44  CE2 PHE C   3       9.129  19.902  11.398  1.00  0.00    -0.023 A 
+ATOM     45  HE2 PHE C   3      10.168  19.864  10.812  1.00  0.00     0.048 H 
+ATOM     46  CD2 PHE C   3       8.228  18.924  10.956  1.00  0.00    -0.017 A 
+ATOM     47  HD2 PHE C   3       8.609  18.308  10.009  1.00  0.00     0.049 H 
+ATOM     48  N   ASP C   4       3.939  18.687  11.250  1.00  0.00    -0.356 N 
+ATOM     49  H   ASP C   4       3.548  17.861  10.487  1.00  0.00     0.162 HD
+ATOM     50  CA  ASP C   4       3.193  19.902  10.948  1.00  0.00     0.097 C 
+ATOM     51  HA  ASP C   4       2.399  19.826  10.058  1.00  0.00     0.088 H 
+ATOM     52  C   ASP C   4       4.131  21.008  10.479  1.00  0.00     0.241 C 
+ATOM     53  O   ASP C   4       3.791  22.193  10.555  1.00  0.00    -0.271 OA
+ATOM     54  CB  ASP C   4       2.450  20.399  12.190  1.00  0.00     0.045 C 
+ATOM     55  HB2 ASP C   4       2.143  21.555  12.123  1.00  0.00     0.051 H 
+ATOM     56  HB3 ASP C   4       1.376  19.875  12.145  1.00  0.00     0.051 H 
+ATOM     57  CG  ASP C   4       2.700  20.313  13.669  1.00  0.00     0.292 C 
+ATOM     58  OD1 ASP C   4       3.787  19.809  14.035  1.00  0.00    -0.152 OA
+ATOM     59  OD2 ASP C   4       1.811  20.823  14.380  1.00  0.00    -0.263 OA
+ATOM     60  N   GLU C   5       5.312  20.629   9.993  1.00  0.00    -0.346 N 
+ATOM     61  H   GLU C   5       5.469  19.575   9.473  1.00  0.00     0.163 HD
+ATOM     62  CA  GLU C   5       6.282  21.597   9.497  1.00  0.00     0.090 C 
+ATOM     63  HA  GLU C   5       5.989  22.714   9.792  1.00  0.00     0.087 H 
+ATOM     64  C   GLU C   5       6.304  21.606   7.974  1.00  0.00     0.241 C 
+ATOM     65  O   GLU C   5       7.242  22.128   7.363  1.00  0.00    -0.271 OA
+ATOM     66  CB  GLU C   5       7.687  21.253   9.995  1.00  0.00    -0.029 C 
+ATOM     67  HB2 GLU C   5       7.360  21.154  11.140  1.00  0.00     0.037 H 
+ATOM     68  HB3 GLU C   5       8.279  20.657   9.147  1.00  0.00     0.037 H 
+ATOM     69  CG  GLU C   5       8.617  22.482  10.165  1.00  0.00     0.018 C 
+ATOM     70  HG2 GLU C   5       9.729  22.323  10.581  1.00  0.00     0.049 H 
+ATOM     71  HG3 GLU C   5       8.894  23.122   9.190  1.00  0.00     0.049 H 
+ATOM     72  CD  GLU C   5       8.173  23.634  11.089  1.00  0.00     0.172 C 
+ATOM     73  OE1 GLU C   5       8.107  23.396  12.315  1.00  0.00    -0.648 OA
+ATOM     74  OE2 GLU C   5       8.115  24.802  10.633  1.00  0.00    -0.648 OA
+ATOM     75  N   VAL C   6       5.275  21.030   7.354  1.00  0.00    -0.346 N 
+ATOM     76  H   VAL C   6       4.202  20.782   7.802  1.00  0.00     0.163 HD
+ATOM     77  CA  VAL C   6       5.178  20.996   5.899  1.00  0.00     0.092 C 
+ATOM     78  HA  VAL C   6       6.188  20.773   5.309  1.00  0.00     0.088 H 
+ATOM     79  C   VAL C   6       4.551  22.279   5.369  1.00  0.00     0.241 C 
+ATOM     80  O   VAL C   6       4.340  22.422   4.161  1.00  0.00    -0.271 OA
+ATOM     81  CB  VAL C   6       4.314  19.817   5.445  1.00  0.00    -0.033 C 
+ATOM     82  HB  VAL C   6       3.313  19.671   6.079  1.00  0.00     0.042 H 
+ATOM     83  CG1 VAL C   6       3.596  20.015   4.104  1.00  0.00    -0.071 C 
+ATOM     84 1HG1 VAL C   6       3.096  18.966   3.800  1.00  0.00     0.028 H 
+ATOM     85 2HG1 VAL C   6       2.601  20.677   3.995  1.00  0.00     0.028 H 
+ATOM     86 3HG1 VAL C   6       4.258  20.182   3.117  1.00  0.00     0.028 H 
+ATOM     87  CG2 VAL C   6       5.048  18.476   5.595  1.00  0.00    -0.071 C 
+ATOM     88 1HG2 VAL C   6       5.754  18.181   6.514  1.00  0.00     0.028 H 
+ATOM     89 2HG2 VAL C   6       5.744  18.212   4.656  1.00  0.00     0.028 H 
+ATOM     90 3HG2 VAL C   6       4.289  17.548   5.625  1.00  0.00     0.028 H 
+ATOM     91  N   PHE C   7       4.252  23.213   6.271  1.00  0.00    -0.346 N 
+ATOM     92  H   PHE C   7       4.306  23.192   7.452  1.00  0.00     0.163 HD
+ATOM     93  CA  PHE C   7       3.666  24.490   5.884  1.00  0.00     0.093 C 
+ATOM     94  HA  PHE C   7       2.623  24.145   5.414  1.00  0.00     0.088 H 
+ATOM     95  C   PHE C   7       4.629  25.282   5.007  1.00  0.00     0.241 C 
+ATOM     96  O   PHE C   7       5.700  25.693   5.464  1.00  0.00    -0.271 OA
+ATOM     97  CB  PHE C   7       3.344  25.331   7.122  1.00  0.00    -0.014 C 
+ATOM     98  HB2 PHE C   7       2.697  24.745   7.937  1.00  0.00     0.043 H 
+ATOM     99  HB3 PHE C   7       2.467  26.008   6.664  1.00  0.00     0.043 H 
+ATOM    100  CG  PHE C   7       3.810  26.589   7.865  1.00  0.00    -0.056 A 
+ATOM    101  CD1 PHE C   7       3.832  26.496   9.256  1.00  0.00    -0.077 A 
+ATOM    102  HD1 PHE C   7       4.640  25.977   9.952  1.00  0.00     0.084 H 
+ATOM    103  CE1 PHE C   7       3.170  27.551   9.907  1.00  0.00    -0.082 A 
+ATOM    104  HE1 PHE C   7       2.494  27.356  10.862  1.00  0.00     0.083 H 
+ATOM    105  CZ  PHE C   7       3.305  28.835   9.386  1.00  0.00    -0.083 A 
+ATOM    106  HZ  PHE C   7       2.850  29.766   9.965  1.00  0.00     0.083 H 
+ATOM    107  CE2 PHE C   7       3.910  29.009   8.129  1.00  0.00    -0.082 A 
+ATOM    108  HE2 PHE C   7       4.153  30.118   7.782  1.00  0.00     0.083 H 
+ATOM    109  CD2 PHE C   7       4.171  27.853   7.364  1.00  0.00    -0.077 A 
+ATOM    110  HD2 PHE C   7       4.903  28.162   6.483  1.00  0.00     0.084 H 
+ATOM    111  N   TYR C   8       4.254  25.498   3.747  1.00  0.00    -0.349 N 
+ATOM    112  H   TYR C   8       3.101  25.563   3.460  1.00  0.00     0.163 HD
+ATOM    113  CA  TYR C   8       5.099  26.273   2.805  1.00  0.00     0.082 C 
+ATOM    114  HA  TYR C   8       5.099  27.431   3.096  1.00  0.00     0.081 H 
+ATOM    115  C   TYR C   8       4.405  26.373   1.432  1.00  0.00     0.374 A 
+ATOM    116  O   TYR C   8       3.862  25.384   0.930  1.00  0.00    -0.147 OA
+ATOM    117  CB  TYR C   8       6.457  25.593   2.617  1.00  0.00    -0.020 C 
+ATOM    118  HB2 TYR C   8       6.280  24.715   1.829  1.00  0.00     0.043 H 
+ATOM    119  HB3 TYR C   8       7.216  26.490   2.407  1.00  0.00     0.043 H 
+ATOM    120  CG  TYR C   8       7.335  24.687   3.499  1.00  0.00    -0.072 A 
+ATOM    121  CD1 TYR C   8       7.185  24.425   4.868  1.00  0.00    -0.014 A 
+ATOM    122  HD1 TYR C   8       7.863  25.305   5.314  1.00  0.00     0.049 H 
+ATOM    123  CE1 TYR C   8       7.506  23.106   5.247  1.00  0.00     0.010 A 
+ATOM    124  HE1 TYR C   8       7.786  23.526   6.321  1.00  0.00     0.052 H 
+ATOM    125  CZ  TYR C   8       8.495  22.370   4.566  1.00  0.00     0.049 A 
+ATOM    126  OH  TYR C   8       8.950  21.210   5.135  1.00  0.00    -0.365 OA
+ATOM    127  HH  TYR C   8      10.109  21.332   5.356  1.00  0.00     0.217 HD
+ATOM    128  CE2 TYR C   8       8.991  22.846   3.337  1.00  0.00    -0.054 A 
+ATOM    129  HE2 TYR C   8       9.767  22.229   2.683  1.00  0.00     0.087 H 
+ATOM    130  CD2 TYR C   8       8.434  24.059   2.879  1.00  0.00    -0.078 A 
+ATOM    131  HD2 TYR C   8       9.220  24.618   2.184  1.00  0.00     0.084 H 
+ATOM    132  N   LYS C   9       4.546  26.132   0.205  1.00  0.00     0.103 N 
+ATOM    133  H   LYS C   9       3.566  26.620  -0.291  1.00  0.00     0.323 HD
+ATOM    134  CA  LYS C   9       5.446  26.214  -0.946  1.00  0.00     0.218 C 
+ATOM    135  HA  LYS C   9       6.519  26.344  -0.445  1.00  0.00     0.106 H 
+ATOM    136  C   LYS C   9       5.417  27.680  -1.532  1.00  0.00     0.208 C 
+ATOM    137  O   LYS C   9       4.546  28.498  -1.140  1.00  0.00    -0.646 OA
+ATOM    138  CB  LYS C   9       5.010  25.222  -2.159  1.00  0.00    -0.025 C 
+ATOM    139  HB2 LYS C   9       4.409  25.677  -3.087  1.00  0.00     0.036 H 
+ATOM    140  HB3 LYS C   9       4.308  24.315  -1.824  1.00  0.00     0.036 H 
+ATOM    141  CG  LYS C   9       6.459  24.822  -2.479  1.00  0.00    -0.061 C 
+ATOM    142  HG2 LYS C   9       6.929  25.806  -2.964  1.00  0.00     0.033 H 
+ATOM    143  HG3 LYS C   9       6.832  24.246  -1.502  1.00  0.00     0.033 H 
+ATOM    144  CD  LYS C   9       6.872  23.812  -3.549  1.00  0.00    -0.043 C 
+ATOM    145  HD2 LYS C   9       6.515  24.049  -4.666  1.00  0.00     0.035 H 
+ATOM    146  HD3 LYS C   9       6.314  22.775  -3.338  1.00  0.00     0.035 H 
+ATOM    147  CE  LYS C   9       8.408  23.859  -3.449  1.00  0.00     0.080 C 
+ATOM    148  HE2 LYS C   9       8.686  22.830  -2.903  1.00  0.00     0.075 H 
+ATOM    149  HE3 LYS C   9       9.034  24.668  -2.826  1.00  0.00     0.075 H 
+ATOM    150  NZ  LYS C   9       9.212  23.807  -4.680  1.00  0.00    -0.079 N 
+ATOM    151  HZ1 LYS C   9       8.909  22.850  -5.334  1.00  0.00     0.274 HD
+ATOM    152  HZ2 LYS C   9       9.105  24.749  -5.416  1.00  0.00     0.274 HD
+ATOM    153  HZ3 LYS C   9      10.399  23.677  -4.558  1.00  0.00     0.274 HD
+ATOM    154  OXT LYS C   9       6.398  28.010  -2.253  1.00  0.00    -0.646 OA
+ENDROOT
+TORSDOF 40

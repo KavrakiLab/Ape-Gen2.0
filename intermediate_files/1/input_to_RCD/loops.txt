@@ -1,1 +1,1 @@
-intermediate_files/1/input_to_RCD/anchored_pMHC.pdb 3 7 C CDEVI
+intermediate_files/1/input_to_RCD/anchored_pMHC.pdb 3 7 C FDEVF
