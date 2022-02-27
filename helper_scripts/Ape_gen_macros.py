@@ -6,7 +6,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from pdbtools import pdb_merge, pdb_tidy, pdb_reatom
+from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort
+
+from constraint import *
 
 ## MACROS
 
@@ -57,14 +59,14 @@ def copy_batch_of_files(src, dst, query):
 
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
-	tidied = pdb_tidy.run(merged, strict=True)
+	sorteded = pdb_sort.run(merged, sorting_keys='-RC') # Potentially breaking -> Not working?
+	tidied = pdb_tidy.run(sorteded, strict=True)
 	reatomed = pdb_reatom.run(tidied, starting_value=1)
-	with open(dst, 'w') as anchored_MHC_file:
-		anchored_MHC_file.write(''.join(reatomed))
-	anchored_MHC_file.close()
+	with open(dst, 'w') as pdb_file:
+		pdb_file.write(''.join(reatomed))
+	pdb_file.close()
 
-def remove_remarks_and_others_from_pdb(pdb_file):
-	records = ('ATOM', 'TER', 'END ')
+def remove_remarks_and_others_from_pdb(pdb_file, records=('ATOM', 'TER', 'END ')): 
 	fhandle = open(pdb_file, 'r')
 	for line in fhandle:
 		if line.startswith(records):
@@ -164,3 +166,87 @@ def PTM_error_checking(amino_acid):
 	else:
 		print("Wrong PTM prefix, check PTM notation")
 		sys.exit(0)
+
+## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
+
+def extract_CONECT_from_pdb(pdb_file):
+
+	edge_list = []
+	taken = remove_remarks_and_others_from_pdb(pdb_file, records=("CONECT "))
+	conect_fields = ''.join(taken)
+	for line in conect_fields.split('\n'):
+		cleaned_line = [elem for elem in line.strip().split(' ') if len(elem) > 0]
+		try:
+			pivot = cleaned_line[1]
+			for atom_index in cleaned_line[2:]:
+				edge_list.append([int(pivot), int(atom_index)])
+		except IndexError:
+			pass
+	return edge_list
+
+def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
+
+	# Note to change the 4-letter atoms if need be!
+	atom_dict = {'ALA':["CA", "C", "CB"],
+				 'VAL':["CA", "C", "CB", "CG1", "CG2"],
+				 'ILE':["CA", "C", "CB", "CG1", "CG2", "CD"],
+				 'LEU':["CA", "C", "CB", "CG", "CD1", "CD2"],
+				 'MET':["CA", "C", "CB", "CG", "SD", "CE"],
+			     'PHE':["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"],
+				 'TYR':["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "HH"],
+				 'TRP':["CA", "C", "CB", "CG", "CD1", "CD2", "NE1", "HE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"],
+				 'SER':["CA", "C", "CB", "OG", "HG1"],
+				 'THR':["CA", "C", "CB", "OG1", "HG1", "CG2"],
+				 'ASN':["CA", "C", "CB", "CG", "OD1", "ND2", "HD21", "HD22"],
+				 'GLN':["CA", "C", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"],
+				 'CYS':["CA", "C", "CB", "SG"],
+				 'GLY':["CA", "C"],
+				 'PRO':["CA", "C", "CB", "CG", "CD"],
+				 'ARG':["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"],
+				 'HIS':["CA", "C", "CB", "CG", "ND1", "HD1", "CE1", "NE2", "CD2"],
+				 'LYS':["CA", "C", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2", "HZ3"],
+				 'ASP':["CA", "C", "CB", "CG", "OD1", "OD2"],
+				 'GLU':["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]
+			    }
+
+	constraint_dict = {'ALA':[["CA", "C"], ["CA", "CB"]],
+					   'VAL':[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"]],
+					   'ILE':[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"], ["CG1", "CD"]],
+					   'LEU':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"]],
+					   'MET':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "SD"], ["SD", "CE"]],
+					   'PHE':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"]],
+					   'TYR':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"], ["CZ", "OH"], ["OH", "HH"]],
+					   'TRP':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "NE1"], ["NE1", "CE2"], ["NE1", "HE1"], ["CD2", "CE2"], ["CD2", "CE3"], ["CE2", "CZ2"], ["CE3", "CZ3"], ["CZ2", "CH2"], ["CH2", "CZ3"]],
+					   'SER':[["CA", "C"], ["CA", "CB"], ["CB", "OG"], ["OG", "HG1"]],
+					   'THR':[["CA", "C"], ["CA", "CB"], ["CB", "OG1"], ["OG1", "HG1"], ["CB", "CG2"]],
+					   'ASN':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND2"], ["ND2", "HD21"], ["ND2", "HD22"]],
+					   'GLN':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "NE2"], ["NE2", "HE21"], ["NE2", "HE22"]],
+					   'CYS':[["CA", "C"], ["CA", "CB"], ["CB", "SG"], ["SG", "HG1"]],
+					   'GLY':[["CA", "C"]],
+					   'PRO':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]],
+					   'ARG':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "HE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"], ["NH1", "HH11"], ["NH1", "HH12"], ["NH2", "HH21"], ["NH2", "HH22"]],
+					   'HIS':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["ND1", "HD1"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]],
+					   'LYS':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "CE"], ["CE", "NZ"], ["NZ", "HZ1"], ["NZ", "HZ2"], ["NZ", "HZ3"]],
+					   'ASP':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "OD1"], ["CG", "OD2"]],
+					   'GLU':[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "OE2"]]
+					   }
+
+	# Formulating the atom matching problem as a CSP:
+	problem = Problem()
+
+	# Adding atoms as variables to the CSP (along with possible index values they can take (CA and C are known):
+	problem.addVariable("CA", [CA_loc])
+	problem.addVariable("C", [C_loc])
+	problem.addVariables((atom_dict[residue])[2:], atom_indexes)
+
+	# Adding Constraints to the CSP
+	# 1. No atoms share the same index
+	problem.addConstraint(AllDifferentConstraint())
+
+	# 2. Topological constraints that are associated with each residue:
+	for elem in constraint_dict[residue]:
+		problem.addConstraint(lambda a, b: ([a,b] in edge_list) and ([b,a] in edge_list), elem)
+
+	# 3. Find problem solution
+	solution = problem.getSolutions()[0]
+	return pd.DataFrame(data={'atom_name': solution.keys(), 'atom_number': list(solution.values())})
