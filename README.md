@@ -44,25 +44,28 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 ### Main Workflow:
 
 #### Minor issues:
+- CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
 - Implement `PDBFixer` steps in a better way (it's the same function in all of the 3 classes basically)
-- Make `os.remove` calls a shutil function
+- Make `os.remove` calls a macro function
 - The `receptor_template_file` variable in Section 1b is questionable, investigate more
 - Manually overwrite `prepare_ligand4.py` with the changes that do not cause errors
 - Get debug message inside the print statements happening in the classes
 - Fix `initialize_dir` function to accept a list of directories and avoid calling the function multiple times
 - Consider peptide methods which receptor is an input to be transferred to the `pMHC_class`, and a pMHC object defined
-- `peptide_index` in methods is annoying, maybe replace it with a new field
+- `peptide_index` in methods is annoying, maybe replace it with a new class field
 - `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
 - Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
-- See if you can fix the script that replaces the flexible residues to the receptor (`ProDy` installation could be avoided). -> UPDATE: This needs fixing, GNINA script is not working properly, and Jayvee's old code is not either for many reasons. A routing NEEDS to be build that updates probably based on the CONNECT fields and solving a CSP for each atom.   
+- OpenMM preparation can happen in parallel, an easy and necessary fix
+- Should complexes be re-scored with SMINA after OpenMM potential energy calculation? (No optim)
 - Implement other inputs (native, HLA sequence, etc.)
 - Testing/Testing/Testing...
 
 ### PTMs:
 
+#### Major issues:
 - Implement other PTMs:
 	- Already done:
 		- Phosphorylation
@@ -77,12 +80,13 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 		- Malondialdehyde adducts
 		- C-Oxidation
 		- M-Oxidation
-- Ask Mauricio/Dinler about N-termini PTMs
-- Bring also Deamidation issue
+
+#### Minor issues:
+- Do basic and most common PTMs (do not care about the N-Termini + advanced options for now), but something to expand upon in the future
+- Deamindation is not needed for now, but since it has been observed, 
 
 ### OpenMM:
 
-- Re-writing OpenMM and improve the code (in progress)
 - Implement PTMs in the OpenMM step (see phosphorylation example that is working on the old version)
 - Update forcefield parameters for PTMs with the one released this year from Mackerel's group
 	- https://www.charmm.org/charmm/resources/charmm-force-fields/
