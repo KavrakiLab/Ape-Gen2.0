@@ -18,6 +18,8 @@ from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
 from time import sleep
+from pdbfixer import PDBFixer
+from openmm.app import PDBFile
 
 def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
 
@@ -199,6 +201,7 @@ def apegen(args):
 		if debug: print("Performing RCD")
 		receptor_template.RCD(peptide, RCD_dist_tol, num_loops, filestore)
 
+
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/SMINA_data')
@@ -249,23 +252,45 @@ def apegen(args):
 		print("\n\nEnd of round no. " + str(current_round) + "!!!")
 		create_csv_from_list_of_files(filestore + '/total_results.csv', glob.glob(filestore + '/SMINA_data/per_peptide_results/*.log'))
 		results_csv = pretty_print_analytics(filestore + '/total_results.csv')
-		results_csv.to_csv(filestore + '/successful_conformations_statistics.csv')
+		results_csv.to_csv(filestore + '/successful_conformations_statistics.csv', index = False)
 
 		# OpenMM step. It seems to be parallel on its own, so no need to put it in a loop (but also inverstigate more?)		
 		# A) Use nested for loops, as for every remaining conformation, we do *N* different OpenMM tries
 		# B) Re-print results after the OpenMM step (include SMINA but also energies calculated from OpenMM?)
 		if score_with_openmm:
+			print("\n\n Chose OPENMM optimization!\n")
 			initialize_dir(filestore + '/OpenMM_confs')
-			for pMHC_conformation in tqdm(glob.glob(filestore + '/SMINA_data/pMHC_complexes/*.pdb'), desc="pMHC conf",
-										  position = 0):
+			initialize_dir(filestore + '/OpenMM_confs/minimized_receptors')
+			initialize_dir(filestore + '/OpenMM_confs/minimized_complexes')
+			initialize_dir(filestore + '/OpenMM_confs/pMHC_complexes/')
+
+			successful_confs = results_csv['Peptide index'].tolist()
+			for conf in tqdm(successful_confs, desc="pMHC conf", position = 0):
+				
+				# First I need to fix the receptors through PDBFixer:
+
+				fixer = PDBFixer(filename=filestore + '/SMINA_data/minimized_receptors/receptor_' + str(conf) + ".pdb")
+				fixer.findMissingResidues()
+				fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
+				fixer.findMissingAtoms()
+				fixer.addMissingAtoms()
+				fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+				PDBFile.writeFile(fixer.topology, fixer.positions, open(filestore + '/OpenMM_confs/minimized_receptors/receptor_' + str(conf) + ".pdb", 'w'))
+
+				# Unify peptide and receptor together
+				pMHC_conformation = filestore + "/OpenMM_confs/pMHC_complexes/pMHC_" + str(conf) + ".pdb"
+				merge_and_tidy_pdb([filestore + '/OpenMM_confs/minimized_receptors/receptor_' + str(conf) + ".pdb",
+									filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf) + ".pdb"], 
+									pMHC_conformation)
+
 				numTries = 10
-				best_energy = 0
+				best_energy = float("inf")
 				pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
 												leave=False):
 					pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
-					best_energy = pMHC_complex.minimizeConf(device, best_energy)
-			copy_batch_of_files(filestore + '/OpenMM_confs/', 
+					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
+			copy_batch_of_files(filestore + '/OpenMM_confs/minimized_complexes/', 
 								filestore + '/Final_conformations/',
 								query="pMHC_")
 		else:
@@ -289,7 +314,7 @@ def apegen(args):
 			best_conformation = results_csv[results_csv['Affinity'].astype('float') == best_energy]
 			best_conformation_index = best_conformation['Peptide index'].values[0]
 			print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
-			copy_file(filestore + '//SMINA_data/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
+			copy_file(filestore + '/SMINA_data/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
 				  	  filestore + '/min_energy_system.pdb')
 			copy_file(filestore + '/SMINA_data/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
 				  	  filestore + '/min_energy.log')
@@ -301,7 +326,7 @@ def apegen(args):
 			# Finally, advance to the next round!
 			current_round += 1
 			
-	# Ending and final statistics
+	# Ending and final statisticsI can 
 	print("\n\nEnd of APE-Gen !!!")
 	create_csv_from_list_of_files(temp_files_storage + '/APE_gen_best_run_results.csv', 
 								  ["{}/{}/min_energy.log".format(temp_files_storage,i) for i in range(1, num_rounds + 1)])
