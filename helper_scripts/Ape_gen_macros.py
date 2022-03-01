@@ -167,6 +167,9 @@ def PTM_error_checking(amino_acid):
 		print("Wrong PTM prefix, check PTM notation")
 		sys.exit(0)
 
+
+		
+
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
 
 def extract_CONECT_from_pdb(pdb_file):
