@@ -12,7 +12,11 @@ from subprocess import call
 import shutil
 import os
 
-from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
+# OPENMM
+from openmm.app import *
+from openmm import *
+from openmm.unit import *
+from sys import stdout
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -134,6 +138,7 @@ class pMHC(object):
 																  ), outname = "model")
 		initialize_dir(filestore + '/RCD_data/splits')	
 		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
+		os.remove(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, reference, pep_seq):
 
@@ -176,7 +181,13 @@ class pMHC(object):
 		force.addPerParticleParameter("x0")
 		force.addPerParticleParameter("y0")
 		force.addPerParticleParameter("z0")
-		protein_particles = md.load(filename).top.select("backbone")
+		
+		#protein_particles = md.load(filename).top.select("backbone")
+
+		ppdb = PandasPdb()
+		ppdb.read_pdb(self.pdb_filename)
+		pdb_df = ppdb.df['ATOM']
+		protein_particles = [atomind - 1 for atomind in pdb_df[pdb_df['atom_name'].isin(["N", "O", "C", "CA"])]['atom_number'].tolist()]
 		particle_indices = []
 		for protein_particle in protein_particles:
 			particle_indices.append(force.addParticle(int(protein_particle), modeller.positions[protein_particle]) )
@@ -206,7 +217,7 @@ class pMHC(object):
 		if energy < best_energy:
 			best_energy = energy
 			path, file = os.path.split(self.pdb_filename)
-			r = PDBReporter(filestore + '/OpenMM_confs/' + file, 1)
+			r = PDBReporter(filestore + '/OpenMM_confs/minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
    		
 		return best_energy 
