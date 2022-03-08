@@ -33,18 +33,11 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 	peptide = Peptide.frompdb(assembled_peptide)
 
-	#peptide_is_not_valid = peptide.prepare_for_scoring(filestore, peptide_index, current_round)
-	#if(peptide_is_not_valid): return
-
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.add_sidechains(filestore, peptide_index)
 
 	# 3. Do PTMs
 	peptide.perform_PTM(filestore, peptide_index, PTM_list)
-
-	# Intermediate OpenMM step that fixes things maybe?
-	#peptide.minimizeConf(filestore, peptide_index)
-	#input()
 
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
@@ -260,35 +253,40 @@ def apegen(args):
 		if score_with_openmm:
 			print("\n\n Chose OPENMM optimization!\n")
 			initialize_dir(filestore + '/OpenMM_confs')
-			initialize_dir(filestore + '/OpenMM_confs/minimized_receptors')
+			initialize_dir(filestore + '/OpenMM_confs/fixed_receptors')
 			initialize_dir(filestore + '/OpenMM_confs/minimized_complexes')
 			initialize_dir(filestore + '/OpenMM_confs/pMHC_complexes/')
+			initialize_dir(filestore + '/OpenMM_confs/connected_pMHC_complexes/')
+			initialize_dir(filestore + '/OpenMM_confs/PTM_conect_indexes/')
 
 			successful_confs = results_csv['Peptide index'].tolist()
 			for conf in tqdm(successful_confs, desc="pMHC conf", position = 0):
 				
-				# First I need to fix the receptors through PDBFixer:
+				# First I need to fix the receptors through PDBFixer, as the non-polar hydrogens could be in wrong places:
 
 				fixer = PDBFixer(filename=filestore + '/SMINA_data/minimized_receptors/receptor_' + str(conf) + ".pdb")
 				fixer.findMissingResidues()
-				fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
+				fixer.removeHeterogens(True)
 				fixer.findMissingAtoms()
 				fixer.addMissingAtoms()
 				fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-				PDBFile.writeFile(fixer.topology, fixer.positions, open(filestore + '/OpenMM_confs/minimized_receptors/receptor_' + str(conf) + ".pdb", 'w'))
+				PDBFile.writeFile(fixer.topology, fixer.positions, open(filestore + '/OpenMM_confs/fixed_receptors/receptor_' + str(conf) + ".pdb", 'w'))
 
-				# Unify peptide and receptor together
+				# Secondly, unify peptide and receptor together and create a new pMHC complex
 				pMHC_conformation = filestore + "/OpenMM_confs/pMHC_complexes/pMHC_" + str(conf) + ".pdb"
-				merge_and_tidy_pdb([filestore + '/OpenMM_confs/minimized_receptors/receptor_' + str(conf) + ".pdb",
+				merge_and_tidy_pdb([filestore + '/OpenMM_confs/fixed_receptors/receptor_' + str(conf) + ".pdb",
 									filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf) + ".pdb"], 
 									pMHC_conformation)
+				pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+
+				# Thirdly, if there is a PTM somewhere, we need to give the appropriate CONECT fields to the PTM residue
+				pMHC_complex.add_PTM_CONECT_fields(filestore, PTM_list, conf)
 
 				numTries = 10
 				best_energy = float("inf")
-				pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+				
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
 												leave=False):
-					pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
 					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
 			copy_batch_of_files(filestore + '/OpenMM_confs/minimized_complexes/', 
 								filestore + '/Final_conformations/',

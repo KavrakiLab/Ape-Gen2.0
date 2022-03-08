@@ -1,6 +1,6 @@
 import pymol2
 
-from helper_scripts.Ape_gen_macros import initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes
+from helper_scripts.Ape_gen_macros import initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -160,6 +160,44 @@ class pMHC(object):
 
 		return pdb_df_peptide.to_numpy()
 
+	def add_PTM_CONECT_fields(self, filestore, PTM_list, peptide_index):
+
+		ppdb_complex = PandasPdb()
+		ppdb_complex.read_pdb(self.pdb_filename)
+		pdb_df_complex = ppdb_complex.df['ATOM']
+
+		# Only peptide
+		pdb_df_complex = pdb_df_complex[pdb_df_complex['chain_id'] == 'C'] 
+
+		file_list = [self.pdb_filename]
+		for PTM in PTM_list:
+			PTM_index = int(PTM.split(' ')[1])
+			sub_pdb = pdb_df_complex[pdb_df_complex['residue_number'] == PTM_index]
+			residue_name = pd.unique(sub_pdb['residue_name'])[0]
+
+			# Define external bonds:
+			external_bonds_list = []
+			if PTM_index != 1:
+				previous_C = pdb_df_complex[(pdb_df_complex['residue_number'] == PTM_index - 1) & (pdb_df_complex['atom_name'] == 'C')]['atom_number'].item()
+				current_N = sub_pdb[sub_pdb['atom_name'] == 'N']['atom_number'].item()
+				external_bonds_list.append((previous_C, current_N))
+			if PTM_index != len(self.peptide.sequence):
+				current_C = sub_pdb[sub_pdb['atom_name'] == 'C']['atom_number'].item()
+				next_N = pdb_df_complex[(pdb_df_complex['residue_number'] == PTM_index + 1) & (pdb_df_complex['atom_name'] == 'N')]['atom_number'].item()
+				external_bonds_list.append((previous_C, current_N))
+
+			conect = replace_CONECT_fields('./PTM_residue_templates/' + residue_name + '.conect',
+										   sub_pdb, external_bonds_list)
+			conected = ''.join(conect)
+			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + '.pdb'
+			with open(conect_file, 'w') as conect_handler:
+				conect_handler.write(conected)
+
+			file_list.append(conect_file)
+
+		self.pdb_filename = filestore + '/OpenMM_confs/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
+		merge_connect_fields(file_list, self.pdb_filename)
+
 	def minimizeConf(self, filestore, best_energy, device='CPU'):
 
 		# Read PDB
@@ -170,7 +208,8 @@ class pMHC(object):
 		positions = np.reshape(positions, (3*numAtoms,1))
 
 		# Create the ForceField
-		forcefield = ForceField('amber/ff14SB.xml', 'amber/phosaa14SB.xml')
+		# forcefield = ForceField('amber/ff14SB.xml', 'amber/phosaa14SB.xml')
+		forcefield = ForceField('charmm/charmm36_nowaters.xml')
 		modeller = Modeller(pdb.topology, pdb.positions)
 		system = forcefield.createSystem(modeller.topology, nonbondedMethod=CutoffNonPeriodic, constraints=None)
 
