@@ -74,18 +74,20 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 		- Phosphorylation
 		- Citrullination
 		- S-Nitrosylation
-	- To Do:
+		- Methylation
 		- Acetylation
 		- Carbamylation
-		- Methylation
+		- P-hydroxylation (non-biological 4S configuration not implemented)
+		- C-Oxidation (not the R variation in CSX)
+		- M-Oxidation (just the default variation)
+	- To Do:
 		- Nitration
-		- P-hydroxylation
-		- Malondialdehyde adducts
-		- C-Oxidation
-		- M-Oxidation
 
 #### Minor issues:
+- Some PTMs are possible for any amino-acid in the N-termini. This has been observed, so future work can focus on adding this extra option. 
+- Malondialdehyde adducts is particularly complex, so I'll leave it for now. 
 - Deamindation is not needed for now, but since it has been observed in pMHCs a lot, maybe implement it by expanding `pytms.py`
+- Some renaming on the extra hydrogens added by `pymol` will be necessary if we are to expand every PTM on openMM/GROMACS. 
 
 ### OpenMM:
 - Update forcefield parameters for PTMs with the one released this year from Mackerel's group
