@@ -36,7 +36,9 @@ Not sure why this is happening in autodocktools, will see if I can manually over
 For now, peptide sequence (along with phosphorylated positions) + HLA allotype works, but native + other types of inputs will follow:
 
 ```
-python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
+python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --debug
+python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --debug --score_with_openmm
+python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ```
 
 ## TO-DOs:
@@ -89,6 +91,7 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 - Update forcefield parameters for PTMs with the one released this year from Mackerel's group
 	- https://www.charmm.org/charmm/resources/charmm-force-fields/
 	- https://github.com/openmm/openmmforcefields/tree/master/charmm#Converting
+
 This will probably happen with the new `openmmforcefields` release (when that happens). 
 
 ### Actual Experiments:

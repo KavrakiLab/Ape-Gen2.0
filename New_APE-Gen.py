@@ -383,15 +383,15 @@ def apegen(args):
 												leave=False):
 					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
 
-			copy_batch_of_files(filestore + '/OpenMM_confs/minimized_complexes/', 
-								filestore + '/Final_conformations/',
-								query="pMHC_")
-
 			# Rescoring and re-filtering resulting conformations
 			if debug: print("\nRescoring and re-filtering resulting conformations:")
 			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=True)
+
+			copy_batch_of_files(filestore + '/OpenMM_confs/pMHC_complexes/', 
+								filestore + '/Final_conformations/',
+								query="pMHC_")
 
 			best_conf_dir = filestore + '/OpenMM_confs/'
 			print("\n\nEnd of OpenMM step of round no. " + str(current_round) + "!!!")
