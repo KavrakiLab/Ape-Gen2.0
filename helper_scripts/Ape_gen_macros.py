@@ -20,7 +20,7 @@ standard_three_to_one_letter_code = {'ARG':'R', 'HIS':'H', 'LYS':'K', 'ASP':'D',
 standard_one_to_three_letter_code = {value: key for key, value in standard_three_to_one_letter_code.items()}
 
 
-non_standard_three_to_one_letter_code = {'SEP':'pS', 'TPO':'pT', 'PTR':'pY'}
+non_standard_three_to_one_letter_code = {'SEP':'pS', 'TPO':'pT', 'PTR':'pY', 'mmK':'m', 'mdK':'d', 'mtK':'t', 'xhC':'h', 'xoC':'o', 'xdC':'d'}
 non_standard_one_to_three_letter_code = {value: key for key, value in non_standard_three_to_one_letter_code.items()}
 
 all_three_to_one_letter_codes = dict(standard_three_to_one_letter_code, **non_standard_three_to_one_letter_code)
@@ -30,7 +30,7 @@ all_one_to_three_letter_codes = dict(standard_one_to_three_letter_code, **non_st
 ## FUNCTIONS
 
 def AA_error_checking(amino_acid):
-	if amino_acid not in standard_three_to_one_letter_code.values():
+	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
 		print("The provided amino acid in the sequence is wrong")
 		sys.exit(0)
 
@@ -111,12 +111,12 @@ def replace_HETATM(pdb_file):
 		yield line
 	fhandle.close()
 
-def delete_elements(pdb_file, element_set):
+def delete_elements(pdb_file, element_set, chains, residues):
 	records = ('ATOM', 'HETATM', 'ANISOU')
 	fhandle = open(pdb_file, 'r')
 	for line in fhandle:
 		if line.startswith(records):
-			if line[13:16].strip() in element_set:
+			if line[13:16].strip() in element_set and line[21].strip() in chains and int(line[25]) in residues:
 				continue
 		yield line
 	fhandle.close()
@@ -145,15 +145,15 @@ def pretty_print_analytics(csv_location):
 # Different PTMs
 
 phosphorylation_list = ['pS', 'pT', 'pY']
-acetylation_list = ['aK'] # Check details on pytms
+acetylation_list = ['aK'] # Check details on pytms -> This is nmot working well, it renames all hydrogens to PyMOL ones
 carbamylation_list = ['cK'] # Check details on pytms
 citrullination_list = ['cR'] 
-methylation_list = ['m1K', 'm2K', 'm3K'] # Check details on pytms
+methylation_list = ['mmK', 'mdK', 'mtK'] # Check details on pytms
 nitration_list = ['nY', 'nW'] # Check details on pytms
 s_nitrosylation_list = ['nC']
-p_hydroxylation_list = ['n4rP', 'n4sP'] # Check details on pytms
-malondialdehyde_list = ['maK'] # Check details on pytms
-c_oxidation_list = ['csoC', 'csxC'] # Check details on pytms
+p_hydroxylation_list = ['nP'] # Check details on pytms
+# malondialdehyde_list = ['maK'] # Check details on pytms, but probably it's too complicated to use that one
+c_oxidation_list = ['xhC', 'xoC', 'xdC'] # Check details on pytms
 m_oxidation_list = ['oM'] # Check details on pytms
 
 
@@ -181,14 +181,58 @@ def PTM_error_checking(amino_acid):
 	elif prefix == 'n':
 		if amino_acid in s_nitrosylation_list: # Keep in mind that we will need an elif here for the rest of n's
 			return "nitrosylate "
+		elif amino_acid in p_hydroxylation_list:
+			return "proline-hydroxylate "
 		else:
-			print("The PTMs that have the n as prefix are s-nitrosylation and nitration_list (maybe p-hydroxylation also). For these PTMs, the only supported amino acids are C, P, W and Y")
+			print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
 			sys.exit(0)
 	elif prefix == 'c':
 		if amino_acid in citrullination_list: # Keep in mind that we will need an elif here for the rest of c's
 			return "citrullinate "
+		elif amino_acid in carbamylation_list:
+			return "carbamylate "
 		else:
 			print("The PTMs that have the c as prefix are carbamylation and citrullination (maybe c_oxidation also). For these PTMs, the only supported amino acids are C, K and R")
+			sys.exit(0)
+	elif prefix == 'a':
+		if amino_acid in acetylation_list:
+			return "acetylate "
+		else:
+			print("The PTM that has the a as prefix is acetylation. For these PTM, the only supported amino acid is K.")
+			sys.exit(0)
+	elif prefix == 'm':
+		if amino_acid in methylation_list:
+			if amino_acid[1] == 'm':
+				return "methylate "
+			elif amino_acid[1] == 'd':
+				return "di-methylate "
+			elif amino_acid[1] == 't':
+				return "tri-methylate "
+			else:
+				print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+				sys.exit(0)
+		else:
+			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			sys.exit(0)
+	elif prefix == 'x':
+		if amino_acid in c_oxidation_list:
+			if amino_acid[1] == 'h':
+				return "cysteine-hydroxydate "
+			elif amino_acid[1] == 'o':
+				return "cysteine-oxydate "
+			elif amino_acid[1] == 'd':
+				return "cysteine-dioxydate "
+			else:
+				print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
+				sys.exit(0)
+		else:
+			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			sys.exit(0)
+	elif prefix == 'o':
+		if amino_acid in m_oxidation_list:
+			return "methionine-oxidization "
+		else:
+			print("PTM chosen is methionine oxidization. For these PTM, the only supported amino acid is M.")
 			sys.exit(0)
 	else:
 		print("Wrong PTM prefix, check PTM notation")

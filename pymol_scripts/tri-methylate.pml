@@ -12,7 +12,7 @@ output_file = sys.argv[3]
 
 cmd.load(input_file)
 cmd.select(name = "sele", selection = "resi " + selection)
-citrullinate selection="sele"
+methylate selection="sele", mode=3
 cmd.save(output_file)
 
 deselect

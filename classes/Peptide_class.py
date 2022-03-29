@@ -92,8 +92,13 @@ class Peptide(object):
 		with open(self.pdb_filename, 'w') as PTMed_file:
 			PTMed_file.write(overwritten)
 
-		# B. A bunch of weird H01 pymol hydrogens that I want to delete
-		delete_pymol_residues = delete_elements(self.pdb_filename, ["H01"])
+		# B. A weird H01 pymol hydrogen that I want to delete. This is added to other residues during the PTM, so I need to remove it:
+		residue_list = list(range(1, len(self.sequence)))
+		for ptm in PTM_list:
+			PTM, selection = ptm.split(' ', 1)
+			residue_list.remove(int(selection))
+
+		delete_pymol_residues = delete_elements(self.pdb_filename, ["H01"], chains=["C"], residues=residue_list)
 		overwritten_2 = ''.join(delete_pymol_residues)
 		with open(self.pdb_filename, 'w') as PTMed_file:
 			PTMed_file.write(overwritten_2)
