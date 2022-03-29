@@ -1,5 +1,5 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files
+from helper_scripts.Ape_gen_macros import initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -17,42 +17,128 @@ from tqdm import tqdm
 from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
-from time import sleep
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
+
+def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol):
+
+	new_filestore = filestore + '/OpenMM_confs'
+
+	# 1. Separate the peptide from the MHC
+	receptor_file, peptide_file = split_receptor_and_peptide(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb")
+
+	# 2. Prepare Receptor for Scoring
+	overwritten = remove_remarks_and_others_from_pdb(receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+	overwritten = ''.join(overwritten)
+	with open(receptor_file, 'w') as receptor_handler:
+		receptor_handler.write(overwritten)
+	receptor_handler.close()
+	receptor = Receptor.frompdb(receptor_file)
+	receptor.doMinimization = True
+	receptor.useSMINA = True
+	receptor.prepare_for_scoring(new_filestore + '/minimized_receptors', index=str(conf_index))
+
+	overwritten = remove_remarks_and_others_from_pdb(peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+	overwritten = ''.join(overwritten)
+	with open(peptide_file, 'w') as peptide_handler:
+		peptide_handler.write(overwritten)
+	peptide_handler.close()	
+	overwritten = replace_HETATM(peptide_file)
+	overwritten = ''.join(overwritten)
+	with open(peptide_file, 'w') as peptide_handler:
+		peptide_handler.write(overwritten)
+	peptide_handler.close()
+	
+	peptide = Peptide.frompdb(peptide_file)
+	peptide.sequence = re.sub('[a-z]', '', peptide.sequence) # Remove PTMs from the sequence
+
+	# 2. Re-score with SMINA (enforce no further minimization)
+	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, conf_index, current_round)
+	if(peptide_is_not_valid): return
+
+	peptide.score_with_SMINA(new_filestore, receptor, conf_index) 
+
+	# 3. Anchor filtering step (probably not needed, anchors are not moving that much)
+	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, conf_index, current_round)
+	if(peptide_is_not_valid): return
+
+	# 4. Create the peptide + MHC ensemble files (Already have those but ok...)
+	peptide.create_peptide_receptor_complexes(new_filestore, receptor, conf_index)
+
+	# Done!
+	return 
+
+def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
+
+	# 1. Remove certain atoms from peptide to adhere to the force field parameters (This is specific to phosaa14SB and should be modified if the force field changes)
+	# THIS IS NOW LEGACY, AS IT WON"T EVER WORK. ASK ON GITHUB OR GO GROMACS.
+	'''
+	for PTM in PTM_list:
+		if int(PTM.split(' ')[1]) == 1:
+			delete_hydrogens = delete_elements(filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf_index) + ".pdb",
+											   ["H2", "H3"])
+			overwritten = ''.join(delete_hydrogens)
+			with open(filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf_index) + ".pdb", 'w') as PTMed_file:
+				PTMed_file.write(overwritten)
+		if int(PTM.split(' ')[1]) == len(peptide.sequence):
+			delete_oxygens = delete_elements(filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf_index) + ".pdb",
+											 ["OXT"])
+			overwritten = ''.join(delete_oxygens)
+			with open(filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf_index) + ".pdb", 'w') as PTMed_file:
+				PTMed_file.write(overwritten)
+	'''
+
+	# 2. Run Receptor through PDBFixer, as the non-polar hydrogens could be in wrong places (they do not participate in the SMINA Minimization process):
+	receptor = Receptor.frompdb(filestore + '/SMINA_data/minimized_receptors/receptor_' + str(conf_index) + ".pdb")
+	receptor.add_sidechains(filestore)
+
+	# 3. Unify peptide and receptor together and create a new pMHC complex
+	pMHC_conformation = filestore + "/OpenMM_confs/pMHC_before_sim/pMHC_" + str(conf_index) + ".pdb"
+	merge_and_tidy_pdb([receptor.pdb_filename,
+						filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf_index) + ".pdb"], 
+						pMHC_conformation)
+	pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+
+	# 4. If there is a phosphorylation somewhere, we need to give the appropriate CONECT fields to the PTM residue
+	pMHC_complex.add_PTM_CONECT_fields(filestore, PTM_list, conf_index)
+
+	# Done!
+	return
 
 def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
+	new_filestore = filestore + '/SMINA_data'
 
 	# 1. Assemble peptide by mergin the peptide anchors and the middle part
 	model_location = filestore + '/RCD_data/splits/model_' + str(peptide_index) + '.pdb'
 	Nterm_location = filestore + '/input_to_RCD/N_ter.pdb'
 	Cterm_location = filestore + '/input_to_RCD/C_ter.pdb'
-	assembled_peptide = filestore + '/SMINA_data/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
+	assembled_peptide = new_filestore + '/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 	peptide = Peptide.frompdb(assembled_peptide)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
-	peptide.add_sidechains(filestore, peptide_index)
+	peptide.add_sidechains(new_filestore, peptide_index)
 
 	# 3. Do PTMs
-	peptide.perform_PTM(filestore, peptide_index, PTM_list)
+	peptide.perform_PTM(new_filestore, peptide_index, PTM_list)
 
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
-	peptide_is_not_valid = peptide.prepare_for_scoring(filestore, peptide_index, current_round)
+	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, peptide_index, current_round)
 	if(peptide_is_not_valid): return
 
-	# 4b. Score with SMINA (or other options, depending on args)
-	peptide.score_with_SMINA(filestore, receptor, peptide_index) 
+	# 4b. Optimize and score with SMINA (or other options, depending on args)
+	peptide.dock_score_with_SMINA(new_filestore, receptor, peptide_index) 
 
 	# 5. Anchor filtering (based on anchor tolerance argument) (improvement from previous version)
-	peptide_is_not_valid = peptide.compute_anchor_tolerance(filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
+	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
 	if(peptide_is_not_valid): return
 
-	# 6. Create the peptide + MHC ensemble files
-	peptide.create_peptide_receptor_complexes(filestore, receptor, peptide_index, current_round)
+	# 6. Fix flexible residue co-ordinates if receptor is flexible
+	if receptor.doMinimization: peptide.fix_flexible_residues(new_filestore, receptor, peptide_index, current_round)
+
+	# 7. Create the peptide + MHC ensemble files
+	peptide.create_peptide_receptor_complexes(new_filestore, receptor, peptide_index)
 
 	# Done!
 	return
@@ -127,6 +213,7 @@ def apegen(args):
 		# Fetch template from peptide template list
 		peptide = Peptide.fromsequence(peptide_input)
 
+
 	# Peptide Template is also a pMHC complex though	
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
 
@@ -141,6 +228,15 @@ def apegen(args):
 		print("Peptide Template: " + peptide_template.pdb_filename)
 		print("Peptide PTMs:")
 		print(PTM_list)
+
+	# Check if:
+	# A. There are any PTMs other than phosphorylation. GROMACS will be considered, but not right know..
+	# B. Phosphorylation is on N-terminus or C-terminus. FF parameters are not given for these cases. 
+	if (('phosphorylate 1' in PTM_list) or ('phosphorylate ' + str(len(peptide.sequence)) in PTM_list)) and (score_with_openmm):
+		sys.exit("\nERROR: Phosphorylation in N-terminus or C-terminus and openMM optimization is NOT supported. Force Field parameters are not released yet. Please omit OpenMM step for modelling this type of PTM.")
+	for PTM in PTM_list:
+		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):	
+			sys.exit("\nERROR: PTM other than phosphorylation is not yet supported with OpenMM. Omit the OpenMM step and stay tuned for changes!")
 
 	# 1b. Receptor
 	if debug: print("Processing Receptor Input")
@@ -200,7 +296,7 @@ def apegen(args):
 		initialize_dir(filestore + '/SMINA_data')
 		receptor = receptor_template.receptor
 		receptor.add_sidechains(filestore)
-		receptor.prepare_for_scoring(filestore)
+		receptor.prepare_for_scoring(filestore + "/SMINA_data")
 
 		# Get peptide template anchor positions for anchor tolerance filtering
 		if debug: print("Extract peptide template anchors for anchor tolerance filtering")
@@ -242,55 +338,67 @@ def apegen(args):
 		#	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6])
 
 		# Print and keep statistics
-		print("\n\nEnd of round no. " + str(current_round) + "!!!")
-		create_csv_from_list_of_files(filestore + '/total_results.csv', glob.glob(filestore + '/SMINA_data/per_peptide_results/*.log'))
-		results_csv = pretty_print_analytics(filestore + '/total_results.csv')
-		results_csv.to_csv(filestore + '/successful_conformations_statistics.csv', index = False)
+		best_conf_dir = filestore + '/SMINA_data/'
+		print("\n\nEnd of main workflow of round no. " + str(current_round) + "!!!")
+		create_csv_from_list_of_files(filestore + '/SMINA_data/total_results.csv', glob.glob(filestore + '/SMINA_data/per_peptide_results/*.log'))
+		results_csv = pretty_print_analytics(filestore + '/SMINA_data/total_results.csv')
+		results_csv.to_csv(filestore + '/SMINA_data/successful_conformations_statistics.csv', index = False)
 
-		# OpenMM step. It seems to be parallel on its own, so no need to put it in a loop (but also inverstigate more?)		
-		# A) Use nested for loops, as for every remaining conformation, we do *N* different OpenMM tries
-		# B) Re-print results after the OpenMM step (include SMINA but also energies calculated from OpenMM?)
-		if score_with_openmm:
-			print("\n\n Chose OPENMM optimization!\n")
+		# OpenMM step
+		if(score_with_openmm and results_csv.shape[0] > 0):
+
+			print("\n\nOpennMM optimization!\n")
+
 			initialize_dir(filestore + '/OpenMM_confs')
 			initialize_dir(filestore + '/OpenMM_confs/fixed_receptors')
 			initialize_dir(filestore + '/OpenMM_confs/minimized_complexes')
 			initialize_dir(filestore + '/OpenMM_confs/pMHC_complexes/')
+			initialize_dir(filestore + '/OpenMM_confs/pMHC_before_sim/')
 			initialize_dir(filestore + '/OpenMM_confs/connected_pMHC_complexes/')
 			initialize_dir(filestore + '/OpenMM_confs/PTM_conect_indexes/')
+			initialize_dir(filestore + '/OpenMM_confs/Scoring_results/')
+			initialize_dir(filestore + '/OpenMM_confs/per_peptide_results/')
+			initialize_dir(filestore + '/OpenMM_confs/minimized_receptors/')
+			initialize_dir(filestore + '/OpenMM_confs/Anchor_filtering')
+			initialize_dir(filestore + '/OpenMM_confs/pdbqt_peptides') 
+			initialize_dir(filestore + '/OpenMM_confs/flexible_receptors') 
 
 			successful_confs = results_csv['Peptide index'].tolist()
-			for conf in tqdm(successful_confs, desc="pMHC conf", position = 0):
-				
-				# First I need to fix the receptors through PDBFixer, as the non-polar hydrogens could be in wrong places:
+			if debug: print("Preparing input for OpenMM optimization. This may take a while...")
 
-				fixer = PDBFixer(filename=filestore + '/SMINA_data/minimized_receptors/receptor_' + str(conf) + ".pdb")
-				fixer.findMissingResidues()
-				fixer.removeHeterogens(True)
-				fixer.findMissingAtoms()
-				fixer.addMissingAtoms()
-				fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-				PDBFile.writeFile(fixer.topology, fixer.positions, open(filestore + '/OpenMM_confs/fixed_receptors/receptor_' + str(conf) + ".pdb", 'w'))
+			# First prepare for OpenMM
+			arg_list = list(map(lambda e: (e, filestore, peptide, PTM_list), successful_confs))
+			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
+				results = pool.map(prepare_for_openmm, arg_list, progress_bar=True)
 
-				# Secondly, unify peptide and receptor together and create a new pMHC complex
-				pMHC_conformation = filestore + "/OpenMM_confs/pMHC_complexes/pMHC_" + str(conf) + ".pdb"
-				merge_and_tidy_pdb([filestore + '/OpenMM_confs/fixed_receptors/receptor_' + str(conf) + ".pdb",
-									filestore + '/SMINA_data/Anchor_filtering/peptide_' + str(conf) + ".pdb"], 
-									pMHC_conformation)
-				pMHC_complex = pMHC(pdb_filename = pMHC_conformation, peptide = peptide)
+			# Actual minimization step
+			if debug: print("\nMinimizing energy...")
+			for conf_index in tqdm(successful_confs, desc="pMHC conf", position = 0):
 
-				# Thirdly, if there is a PTM somewhere, we need to give the appropriate CONECT fields to the PTM residue
-				pMHC_complex.add_PTM_CONECT_fields(filestore, PTM_list, conf)
-
-				numTries = 10
+				numTries = 1
 				best_energy = float("inf")
-				
+				pMHC_complex = pMHC(pdb_filename = filestore + "/OpenMM_confs/connected_pMHC_complexes/pMHC_" + str(conf_index) + ".pdb", 
+									peptide = peptide)
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
 												leave=False):
 					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
+
 			copy_batch_of_files(filestore + '/OpenMM_confs/minimized_complexes/', 
 								filestore + '/Final_conformations/',
 								query="pMHC_")
+
+			# Rescoring and re-filtering resulting conformations
+			if debug: print("\nRescoring and re-filtering resulting conformations:")
+			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol), successful_confs))
+			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
+				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=True)
+
+			best_conf_dir = filestore + '/OpenMM_confs/'
+			print("\n\nEnd of OpenMM step of round no. " + str(current_round) + "!!!")
+			create_csv_from_list_of_files(filestore + '/OpenMM_confs/total_results.csv', glob.glob(filestore + '/OpenMM_confs/per_peptide_results/*.log'))
+			results_csv = pretty_print_analytics(filestore + '/OpenMM_confs/total_results.csv')
+			results_csv.to_csv(filestore + '/OpenMM_confs/successful_conformations_statistics.csv', index = False)
+
 		else:
 			copy_batch_of_files(filestore + '/SMINA_data/pMHC_complexes/', 
 								filestore + '/Final_conformations',
@@ -312,22 +420,23 @@ def apegen(args):
 			best_conformation = results_csv[results_csv['Affinity'].astype('float') == best_energy]
 			best_conformation_index = best_conformation['Peptide index'].values[0]
 			print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
-			copy_file(filestore + '/SMINA_data/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
-				  	  filestore + '/min_energy_system.pdb')
-			copy_file(filestore + '/SMINA_data/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
-				  	  filestore + '/min_energy.log')
+			copy_file(best_conf_dir + '/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
+				  	  best_conf_dir + '/min_energy_system.pdb')
+			copy_file(best_conf_dir + '/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
+				  	  best_conf_dir + '/min_energy.log')
 
 			# Decide where and how to pass the information for the next round
-			receptor_template.pdb_filename = filestore + '/min_energy_system.pdb'
-			if pass_type == 'pep_and_recept': peptide_template.pdb_filename = filestore + '/min_energy_system.pdb'
+			receptor_template.pdb_filename = best_conf_dir + '/min_energy_system.pdb'
+			if pass_type == 'pep_and_recept': peptide_template.pdb_filename = best_conf_dir + '/min_energy_system.pdb'
 
 			# Finally, advance to the next round!
 			current_round += 1
 			
-	# Ending and final statisticsI can 
+	# Ending and final statistics
 	print("\n\nEnd of APE-Gen !!!")
+	best_conf_dir = 'OpenMM_confs' if score_with_openmm else 'SMINA_data'
 	create_csv_from_list_of_files(temp_files_storage + '/APE_gen_best_run_results.csv', 
-								  ["{}/{}/min_energy.log".format(temp_files_storage,i) for i in range(1, num_rounds + 1)])
+								  ["{}/{}/{}/min_energy.log".format(temp_files_storage,i,best_conf_dir) for i in range(1, num_rounds + 1)])
 	results_csv = pretty_print_analytics(temp_files_storage + '/APE_gen_best_run_results.csv')
 
 if __name__ == "__main__":

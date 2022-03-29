@@ -23,7 +23,7 @@ class Receptor(object):
 
 	@classmethod
 	def frompdb(cls, pdb_filename): # Checking if .pdb file is ok maybe?
-		return cls(allotype = "In PDB", pdb_filename = receptor_class)
+		return cls(allotype = "In PDB", pdb_filename = pdb_filename)
 
 	@classmethod
 	def fromredock(cls, peptide_input):
@@ -75,17 +75,17 @@ class Receptor(object):
 		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
 		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
 
-	def prepare_for_scoring(self, filestore):
+	def prepare_for_scoring(self, filestore, index=""):
 
 		prep_receptor_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 		pdbqt_to_pdb_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
 		
-		self.pdbqt_filename = filestore + "/SMINA_data/receptor_for_smina.pdbqt"
-		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U lps > " + filestore + "/SMINA_data/prepare_receptor4.log 2>&1"], shell=True)
-		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/SMINA_data/receptor_for_smina_temp.pdb > " + filestore + "/SMINA_data/pdbqt_to_pdb.log 2>&1"], shell=True)
+		self.pdbqt_filename = filestore + "/receptor_for_smina" + index + ".pdbqt"
+		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U lps > " + filestore + "/prepare_receptor4.log 2>&1"], shell=True)
+		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/receptor_for_smina_temp" + index + ".pdb > " + filestore + "/pdbqt_to_pdb.log 2>&1"], shell=True)
 
 		# Before we continue here, an issue seems to arise. pdbqt_to_pdb.py introduces some segment identifiers that need to be removed?
-		self.pdb_filename = filestore + "/SMINA_data/receptor_for_smina_temp.pdb"
+		self.pdb_filename = filestore + "/receptor_for_smina_temp" + index + ".pdb"
 		ppdb_receptor = PandasPdb()
 		ppdb_receptor.read_pdb(self.pdb_filename)
 		pdb_df_receptor = ppdb_receptor.df['ATOM']
@@ -93,6 +93,6 @@ class Receptor(object):
 		ppdb_receptor.to_pdb(path=self.pdb_filename, records=None, gz=False, append_newline=True)
 
 		# Adding the following lines to properly have TER and END fields (hence the temp file here, maybe there's a better way to do this)
-		self.pdb_filename = filestore + "/SMINA_data/receptor_for_smina.pdb"
-		merge_and_tidy_pdb([filestore + "/SMINA_data/receptor_for_smina_temp.pdb"], self.pdb_filename)
-		os.remove(filestore + "/SMINA_data/receptor_for_smina_temp.pdb")
+		self.pdb_filename = filestore + "/receptor_for_smina" + index + ".pdb"
+		merge_and_tidy_pdb([filestore + "/receptor_for_smina_temp" + index + ".pdb"], self.pdb_filename)
+		os.remove(filestore + "/receptor_for_smina_temp" + index + ".pdb")

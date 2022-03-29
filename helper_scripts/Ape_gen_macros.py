@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort
+from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain
 
 from constraint import *
 
@@ -66,6 +66,24 @@ def merge_and_tidy_pdb(list_of_pdbs, dst):
 		pdb_file.write(''.join(reatomed))
 	pdb_file.close()
 
+def split_receptor_and_peptide(pdb_file):
+	pdb_path, pdb_filename = os.path.split(pdb_file)
+	pdb_filename = pdb_filename.replace(".pdb", "")
+	receptor_filename = pdb_path + '/' + pdb_filename + "_receptor.pdb"
+	peptide_filename = pdb_path + '/' + pdb_filename + "_peptide.pdb"
+
+	receptor = pdb_selchain.run(open(pdb_file, 'r'), ('A', 'B'))
+	with open(receptor_filename, 'w') as file:
+		file.write(''.join(receptor))
+	file.close()
+
+	peptide = pdb_selchain.run(open(pdb_file, 'r'), ('C',))
+	with open(peptide_filename, 'w') as file:
+		file.write(''.join(peptide))
+	file.close()
+
+	return (receptor_filename, peptide_filename)
+
 def remove_remarks_and_others_from_pdb(pdb_file, records=('ATOM', 'TER', 'END ')): 
 	fhandle = open(pdb_file, 'r')
 	for line in fhandle:
@@ -81,6 +99,15 @@ def replace_chains(pdb_file, chain_from, chain_to):
 			if line[21] == chain_from:
 				yield line[:21] + chain_to + line[22:]
 				continue
+		yield line
+	fhandle.close()
+
+def replace_HETATM(pdb_file):
+	fhandle = open(pdb_file, 'r')
+	for line in fhandle:
+		if line.startswith("HETATM"):
+			yield "ATOM  " + line[6:]
+			continue
 		yield line
 	fhandle.close()
 
@@ -168,24 +195,8 @@ def PTM_error_checking(amino_acid):
 		sys.exit(0)
 
 
-		
 
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
-
-def extract_CONECT_from_pdb(pdb_file):
-
-	edge_list = []
-	taken = remove_remarks_and_others_from_pdb(pdb_file, records=("CONECT "))
-	conect_fields = ''.join(taken)
-	for line in conect_fields.split('\n'):
-		cleaned_line = [elem for elem in line.strip().split(' ') if len(elem) > 0]
-		try:
-			pivot = cleaned_line[1]
-			for atom_index in cleaned_line[2:]:
-				edge_list.append([int(pivot), int(atom_index)])
-		except IndexError:
-			pass
-	return edge_list
 
 def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 
@@ -253,3 +264,44 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 	# 3. Find problem solution
 	solution = problem.getSolutions()[0]
 	return pd.DataFrame(data={'atom_name': solution.keys(), 'atom_number': list(solution.values())})
+
+def extract_CONECT_from_pdb(pdb_file):
+
+	edge_list = []
+	taken = remove_remarks_and_others_from_pdb(pdb_file, records=("CONECT "))
+	conect_fields = ''.join(taken)
+	for line in conect_fields.split('\n'):
+		cleaned_line = [elem for elem in line.strip().split(' ') if len(elem) > 0]
+		try:
+			pivot = cleaned_line[1]
+			for atom_index in cleaned_line[2:]:
+				edge_list.append([int(pivot), int(atom_index)])
+		except IndexError:
+			pass
+	return edge_list
+
+## PREPARE PTMs FOR OPENMM
+
+def replace_CONECT_fields(pdb_file, index_df, external_bonds_list):
+
+	# Take care of the external bonds first
+	for bond in external_bonds_list:
+		yield "CONECT " + str(bond[0]) + " " + str(bond[1]) + "\n"
+
+	# Now the rest of the bonds
+	taken = remove_remarks_and_others_from_pdb(pdb_file, records=("CONECT "))
+	conect_fields = ''.join(taken)
+	for line in conect_fields.split('\n'):
+		if line == "":
+			yield ""
+		else:
+			cleaned_line = [str(index_df[index_df['atom_name'] == elem]['atom_number'].item()) for elem in line.strip().split(' ')[1:] if len(elem) > 0]
+			cleaned_line.append('\n')
+			yield "CONECT " + ' '.join(cleaned_line)
+
+def merge_connect_fields(list_of_pdbs, dst):
+	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
+	sorteded = pdb_sort.run(merged, sorting_keys='-RC') # Potentially breaking -> Not working?
+	with open(dst, 'w') as pdb_file:
+		pdb_file.write(''.join(sorteded))
+	pdb_file.close()

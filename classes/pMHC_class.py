@@ -184,12 +184,12 @@ class pMHC(object):
 			if PTM_index != len(self.peptide.sequence):
 				current_C = sub_pdb[sub_pdb['atom_name'] == 'C']['atom_number'].item()
 				next_N = pdb_df_complex[(pdb_df_complex['residue_number'] == PTM_index + 1) & (pdb_df_complex['atom_name'] == 'N')]['atom_number'].item()
-				external_bonds_list.append((previous_C, current_N))
+				external_bonds_list.append((current_C, next_N))
 
 			conect = replace_CONECT_fields('./PTM_residue_templates/' + residue_name + '.conect',
 										   sub_pdb, external_bonds_list)
 			conected = ''.join(conect)
-			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + '.pdb'
+			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
 			with open(conect_file, 'w') as conect_handler:
 				conect_handler.write(conected)
 
@@ -208,8 +208,8 @@ class pMHC(object):
 		positions = np.reshape(positions, (3*numAtoms,1))
 
 		# Create the ForceField
-		# forcefield = ForceField('amber/ff14SB.xml', 'amber/phosaa14SB.xml')
-		forcefield = ForceField('charmm/charmm36_nowaters.xml')
+		forcefield = ForceField('amber/ff14SB.xml', 'amber/phosaa14SB.xml')
+		# forcefield = ForceField('charmm/charmm36_nowaters.xml')
 		modeller = Modeller(pdb.topology, pdb.positions)
 		system = forcefield.createSystem(modeller.topology, nonbondedMethod=CutoffNonPeriodic, constraints=None)
 
@@ -258,5 +258,5 @@ class pMHC(object):
 			path, file = os.path.split(self.pdb_filename)
 			r = PDBReporter(filestore + '/OpenMM_confs/minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
-   		
+   			
 		return best_energy 

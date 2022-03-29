@@ -44,6 +44,8 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 ### Main Workflow:
 
 #### Minor issues:
+- Have a `write_string` function for all the yields/joins/opens/writes in the code (or maybe for each function do this inside it, the file is overwritten successfully without defining a new one)
+- Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
 - Implement `PDBFixer` steps in a better way (it's the same function in all of the 3 classes basically)
 - Make `os.remove` calls a macro function
@@ -58,9 +60,8 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
-- OpenMM preparation can happen in parallel, an easy and necessary fix
-- Should complexes be re-scored with SMINA after OpenMM potential energy calculation? (No optim)
-- Implement other inputs (native, HLA sequence, etc.)
+- Reconsider the anchor definition/tolerance. Why do we need N-terminus and (C-1)-terminus to be conserved? Discuss
+- Implement other inputs (native, HLA sequence, etc.) in tandem with fetching the extended templates for structural databases
 - Testing/Testing/Testing...
 
 ### PTMs:
@@ -82,28 +83,25 @@ python New_APE-Gen.py ARpSEDEVILpS HLA-A*11:01 --debug
 		- M-Oxidation
 
 #### Minor issues:
-- Do basic and most common PTMs (do not care about the N-Termini + advanced options for now), but something to expand upon in the future
-- Deamindation is not needed for now, but since it has been observed, 
+- Deamindation is not needed for now, but since it has been observed in pMHCs a lot, maybe implement it by expanding `pytms.py`
 
 ### OpenMM:
-
-- Implement PTMs in the OpenMM step (see phosphorylation example that is working on the old version)
 - Update forcefield parameters for PTMs with the one released this year from Mackerel's group
 	- https://www.charmm.org/charmm/resources/charmm-force-fields/
 	- https://github.com/openmm/openmmforcefields/tree/master/charmm#Converting
+This will probably happen with the new `openmmforcefields` release (when that happens). 
 
 ### Actual Experiments:
 
 - Fetch as many templates as you can and assess experiments below in terms of RMSD?
-- Test RCD parameters (mainly number of conformations that are needed)
-- Check Ape-gen cycles
-- Phosphorylated peptides: What experiments can be done here? Using Anja's scoring function maybe?
+- Test RCD parameters/rigid vs. flexible/OpenMM vs. not OpenMM/#Ape-Gen cycles/any other experiment you can think of
+- Phosphorylated peptides: Check with Mauricio on modelling those
 
-### Other possible Expansions:
+### Expansions:
 
 - GUI
 - Ensemble of receptor conformations in RCD step (maybe after that too?)
+- Extend to Class-II using the same principle
 - AlphaFold / RosettaTFold (wait for an API like thing) (could I also generate a bunch of HLAs offline and assess instead?)
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
 - Think about alternative scoring function? )and test it's RMSD to vindardo/vina/CNN)
-
