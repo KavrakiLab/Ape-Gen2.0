@@ -62,8 +62,14 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 - Function documentation needs to be done thouroughly at some point
 
 #### Major issues:
-- Reconsider the anchor definition/tolerance. Why do we need N-terminus and (C-1)-terminus to be conserved? Discuss
-- Implement other inputs (native, HLA sequence, etc.) in tandem with fetching the extended templates for structural databases
+- Implement peptide template fetching: 
+	- RF for predicting anchors pending...
+	- Full policy needs to be implemented
+	- Change in template folders needs to happen
+- Implement HLA template fetching/generating:
+	- I don't think there is need for a supertype thing. Sequence matching will suffice, as we have A*02:06, A*02:07 now...
+- Change anchor tolerance to peptide template anchors instead of N0,N1,C-1,C0
+- Implement other inputs (native for REDOCK mode, HLA sequence, etc.)
 - Testing/Testing/Testing...
 
 ### PTMs:

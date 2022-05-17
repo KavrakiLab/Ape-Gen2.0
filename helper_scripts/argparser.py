@@ -14,6 +14,7 @@ def APE_Gen_parser():
 	#parser.add_argument("--n-mer-templates", default="", help='File with n-mer pdb templates.')
 	#parser.add_argument("--receptor-class-templates", default="", help='File with pdb receptor class templates')
 	#parser.add_argument("--flex_res", default="", help='File with flexible residues')
+	parser.add_argument('--anchors', default="", help='delimited list input', type=str)
 	parser.add_argument("-a", "--anchor_tol", type=float, default=2.0, help='Anchor tolerance (in angstroms) of first and last backbone atoms of peptide when filtering')
 	parser.add_argument("-o", "--score_with_openmm", action="store_true", help='Rescore full conformations with openmm (AMBER)')
 	parser.add_argument("-g", "--num_rounds", type=int, default=1, help='Number of rounds to perform.')

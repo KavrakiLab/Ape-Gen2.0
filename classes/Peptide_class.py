@@ -1,12 +1,13 @@
 import pandas as pd
 from biopandas.pdb import PandasPdb
 import numpy as np
+from Bio import Align
 
 import sys
 import os
 import re
 
-from helper_scripts.Ape_gen_macros import all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver
+from helper_scripts.Ape_gen_macros import all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -50,6 +51,62 @@ class Peptide(object):
 		sequence_length = len(re.sub('[a-z]', '', peptide_sequence)) # Remove PTMs when fetching the template
 		peptide_template = templates[templates['Pep_Length'] == sequence_length]['Template'].values[0]
 		return cls(pdb_filename = ('./templates/' + peptide_template), sequence = peptide_sequence)
+
+	@classmethod
+	def fromsequence2(cls, peptide_sequence, receptor_allotype, anchors):
+
+		# Current policy of selecting/chosing templates is:
+		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches 
+		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
+		# 3) Select the one that is closer in terms of anchor residues
+		# 4) If there are duplicate results, select the one closer to the whole sequence
+		# 5) If there are duplicate results, select at random!
+
+		sequence_length = len(re.sub('[a-z]', '', peptide_sequence)) # Remove PTMs when fetching the template
+		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
+
+		# 1)
+		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
+		# (maybe play with user input for now?)
+		if anchors == "":
+			#anchors = RF # to be continued...
+			anchors = "2,9"
+		anchors_not = process_anchors(anchors, peptide_sequence)
+		templates['anchor_not'] = templates['anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
+		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
+		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
+
+		#2)
+		sub_alleles = pd.unique(templates['MHC']).tolist()
+		sub_alleles.append("Allele")
+		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
+		allele_of_interest = similarity_matrix[similarity_matrix["Allele"] == receptor_allotype].drop("Allele", axis=1).T
+		similar_alleles = allele_of_interest[allele_of_interest == allele_of_interest.min().values[0]].dropna().index.values[0]
+		templates = templates[templates['MHC'] == similar_alleles]
+
+		# 3)
+		peptide_anchor_sequence = peptide_sequence[:2] + peptide_sequence[(len(peptide_sequence) - 2):]
+		template_anchor_sequences = (templates['peptide'].str[:2] + templates['peptide'].str[(len(peptide_sequence) - 2):]).tolist()
+		aligner = Align.PairwiseAligner()
+		aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
+		score_list = []
+		for template_anchor_sequence in template_anchor_sequences:
+			score_list.append(aligner.score(peptide_anchor_sequence, template_anchor_sequence))
+		templates['anchor_score'] = score_list
+		templates = templates[templates['anchor_score'] == templates['anchor_score'].max()].dropna()
+
+		# 4)
+		score_list = []
+		template_sequences = templates['peptide'].tolist()
+		for template_sequence in template_sequences:
+			score_list.append(aligner.score(peptide_sequence, template_sequence))
+		templates['peptide_score'] = score_list
+		templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
+
+		# 5)
+		peptide_template = templates['pdb_code'].sample(n=1).values[0]
+		
+		return cls(pdb_filename = ('./new_templates/' + peptide_template), sequence = peptide_sequence)
 
 	def add_sidechains(self, filestore, peptide_index):
 		fixer = PDBFixer(filename=self.pdb_filename)

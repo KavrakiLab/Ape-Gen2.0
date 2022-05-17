@@ -27,12 +27,40 @@ all_three_to_one_letter_codes = dict(standard_three_to_one_letter_code, **non_st
 all_one_to_three_letter_codes = dict(standard_one_to_three_letter_code, **non_standard_one_to_three_letter_code)
 
 
+anchor_dictionary = {'8': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3',
+				           '5': 'C_-3', '6': 'C_-2', '7': 'C_-1', '8': 'C_+0'},
+		             '9': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
+				           '6': 'C_-3', '7': 'C_-2', '8': 'C_-1', '9': 'C_+0'},
+			         '10': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
+				           '6': 'C_-4', '7': 'C_-3', '8': 'C_-2', '9': 'C_-1', '10': 'C_+0'},
+			         '11': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
+				           '7': 'C_-4', '8': 'C_-3', '9': 'C_-2', '10': 'C_-1', '11': 'C_+0'},
+			         '12': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
+				           '7': 'C_-5', '8': 'C_-4', '9': 'C_-3', '10': 'C_-2', '11': 'C_-1', '12': 'C_+0'},
+			         '13': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
+				           '8': 'C_-5', '9': 'C_-4', '10': 'C_-3', '11': 'C_-2', '12': 'C_-1', '13': 'C_+0'},
+			         '14': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
+				           '8': 'C_-6', '9': 'C_-5', '10': 'C_-4', '11': 'C_-3', '12': 'C_-2', '13': 'C_-1', '14': 'C_+0'},
+			         '15': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6', '8': 'N_+7',
+				           '9': 'C_-6', '10': 'C_-5', '11': 'C_-4', '12': 'C_-3', '13': 'C_-2', '14': 'C_-1', '15': 'C_+0'}}
+
 ## FUNCTIONS
 
 def AA_error_checking(amino_acid):
 	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
 		print("The provided amino acid in the sequence is wrong")
 		sys.exit(0)
+
+def process_anchors(anchors, pep_seq):
+	# Returns the set of anchors
+	pep_length = len(re.sub('[a-z]', '', pep_seq)) # Remove any PTMs that may still exist in the sequence
+	anchor_not = set([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")])
+	return anchor_not
+
+def jaccard_distance(a, b):
+	# Computes jaccard distance between 2 sets
+    c = a.intersection(b)
+    return float(len(c)) / (len(a) + len(b) - len(c))
 
 def initialize_dir(dirname):
 	if os.path.exists(dirname):
@@ -183,6 +211,8 @@ def PTM_error_checking(amino_acid):
 			return "nitrosylate "
 		elif amino_acid in p_hydroxylation_list:
 			return "proline-hydroxylate "
+		elif amino_acid in nitration_list:
+			return "nitrate "
 		else:
 			print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
 			sys.exit(0)

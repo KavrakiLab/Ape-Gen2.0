@@ -174,6 +174,9 @@ def apegen(args):
 	# --Save_only_pep_confs: Disable saving full conformations (peptide and MHC)
 	saveFullConfs = not args.save_only_pep_confs
 
+	# --anchors: User defined anchors for peptide template search + anchor tolerance
+	anchors = args.anchors
+
 	# --Anchor_tolerance? Should this be an option?
 	anchor_tol = args.anchor_tol
 
@@ -204,15 +207,43 @@ def apegen(args):
 
     # 1. INPUT PROCESSING
 
-    # 1a. Peptide
+    # 1a. Receptor
+	if debug: print("Processing Receptor Input")
+	if receptor_class.endswith(".pdb"):
+		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
+		receptor = Receptor.frompdb(receptor_class)
+		receptor_template_file = receptor_class
+	elif receptor_class.endswith(".fasta"):
+		# If this is a sequence, the template is taken by MODELLER
+		receptor = Receptor.fromfasta(receptor_class)
+		receptor_template_file = receptor.pdb_filename
+	elif receptor_class == "REDOCK":
+		# If REDOCK, the receptor template is the peptide template!
+		receptor = Receptor.fromredock(peptide_input)
+		receptor_template_file = peptide.pdb_filename
+	else:
+		# If this is an allotype specification, fetch template like the peptide!
+		receptor = Receptor.fromallotype(receptor_class)
+		receptor_template_file = receptor.pdb_filename
+	receptor.doMinimization = doReceptorMinimization
+	receptor.useSMINA = min_with_smina
+
+	# Receptor Template is a pMHC complex
+	receptor_template = pMHC(pdb_filename = receptor_template_file, receptor = receptor) 
+	if debug:
+		print("Receptor Successfully Processed")
+		print("Receptor Allotype: " + receptor.allotype)
+		print("Receptor Template: " + receptor_template.pdb_filename)
+
+    # 1b. Peptide
 	if debug: print("Processing Peptide Input")
 	if peptide_input.endswith(".pdb"):
-		# Fetch peptide sequence from .pdb and use that .pdb as a template
+		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
 		peptide = Peptide.frompdb(peptide_input)
 	else:
 		# Fetch template from peptide template list
-		peptide = Peptide.fromsequence(peptide_input)
-
+		# peptide = Peptide.fromsequence(peptide_input)
+		peptide = Peptide.fromsequence2(peptide_input, receptor_class, anchors)
 
 	# Peptide Template is also a pMHC complex though	
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
@@ -237,37 +268,6 @@ def apegen(args):
 	for PTM in PTM_list:
 		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):	
 			sys.exit("\nERROR: PTM other than phosphorylation is not yet supported with OpenMM. Omit the OpenMM step and stay tuned for changes!")
-
-	# 1b. Receptor
-	if debug: print("Processing Receptor Input")
-	if receptor_class.endswith(".pdb"):
-		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
-		receptor = Receptor.frompdb(receptor_class)
-		receptor_template_file = receptor_class
-	elif receptor_class.endswith(".fasta"):
-		# If this is a sequence, the template is taken by MODELLER
-		receptor = Receptor.fromfasta(receptor_class)
-		receptor_template_file = receptor.pdb_filename
-	elif receptor_class == "REDOCK":
-		# If REDOCK, the receptor template is the peptide template!
-		receptor = Receptor.fromredock(peptide_input)
-		receptor_template_file = peptide.pdb_filename
-	else:
-		# If this is an allotype specification, fetch template like the peptide!
-		receptor = Receptor.fromallotype(receptor_class)
-		receptor_template_file = receptor.pdb_filename
-	receptor.doMinimization = doReceptorMinimization
-	receptor.useSMINA = min_with_smina
-
-	# As receptor traditionally does not include the target, we will delete the .pdb for now:
-	#receptor.pdb_filename = None (REMIND MYSELF WHY I DO THIS!)
-
-	# Receptor Template is also a pMHC complex
-	receptor_template = pMHC(pdb_filename = receptor_template_file, receptor = receptor) 
-	if debug:
-		print("Receptor Successfully Processed")
-		print("Receptor Allotype: " + receptor.allotype)
-		print("Receptor Template: " + receptor_template.pdb_filename)
 
 	# 2. MAIN LOOP
 	current_round = 1
