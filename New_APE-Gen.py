@@ -135,8 +135,6 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
 	if(peptide_is_not_valid): return
 
-	input()
-
 	# 6. Fix flexible residue co-ordinates if receptor is flexible
 	if receptor.doMinimization:
 		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, peptide_index, current_round)
@@ -328,8 +326,8 @@ def apegen(args):
 
 		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
-		#with WorkerPool(n_jobs=num_cores) as pool:
-		#	results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
+		with WorkerPool(n_jobs=num_cores) as pool:
+			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
 
 		initialize_dir(filestore + '/Final_conformations/')
 
@@ -342,9 +340,9 @@ def apegen(args):
 
 		# Code for non-parallel execution and debugging
 
-		for argument in arg_list:
-			print(argument)
-			peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7])
+		#for argument in arg_list:
+		#	print(argument)
+		#	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7])
 
 		# Print and keep statistics
 		best_conf_dir = filestore + '/SMINA_data'

@@ -73,7 +73,6 @@ class Peptide(object):
 		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
-		# What if the peptide motif does not exist for this particular
 		sub_alleles = pd.unique(templates['MHC']).tolist()
 		sub_alleles.append("Allele")
 		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
@@ -314,12 +313,11 @@ class Peptide(object):
 			                              rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
-			try:
-				print(CA_loc, C_loc)
-				matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
-				print(matching)
-				input()
-			except IndexError:
+			#print(CA_loc, C_loc)
+			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
+			#print(matching)
+			#input()
+			if matching.shape[0] == 0: # Empty Solution
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
 				os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
 				with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'a+') as flexible_log:

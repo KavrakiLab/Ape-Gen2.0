@@ -46,7 +46,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Make `anchor tol` step optional
+- Double check on how the flexible residue code assignment works, because it may attempt to enter the `minimized_receptors` folder without a successfull CSP assignment.
+- Make `anchor tol` step optional.
 - Add `num_of_rounds` in homology modelling as an argument. 
 - Make function in the places where there is repeated code (there is one on peptide similarity tempalte selection)
 - Have a `write_string` function for all the yields/joins/opens/writes in the code (or maybe for each function do this inside it, the file is overwritten successfully without defining a new one)
@@ -68,9 +69,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 #### Major issues:
 - Implement peptide template fetching: 
 	- RF for predicting anchors pending...
-- Implement HLA template fetching/generating:
-	- MODELLER output should go into a log file somehow
-	- MODELLER files go into a separate folder maybe (in the intermediate files)
+- Anchor tolerance anchors are not the correct ones, fix those. 
 - Implement other inputs (native for REDOCK mode, HLA sequence, etc.)
 - Testing/Testing/Testing...
 
