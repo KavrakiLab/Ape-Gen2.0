@@ -1,15 +1,168 @@
-from helper_scripts.Ape_gen_macros import merge_and_tidy_pdb
+from helper_scripts.Ape_gen_macros import merge_and_tidy_pdb, copy_file
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
+import numpy as np
 
 from subprocess import call
 import sys
 import os
+import time
+
+from Bio import Align
+from Bio import SeqIO
+from Bio import pairwise2
 
 # PDBFIXER
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
+
+# MODELLER
+try:
+	from modeller import *
+	from modeller.automodel import *
+except:
+	print("Error with importing Modeller: Make sure license key is correct.")
+	sys.exit(0)
+
+def model_single_opt(filestore, num_models=10):
+
+	log.none()
+	env = Environ()
+
+	# Give less weight to all soft-sphere restraints:
+	env.schedule_scale = physical.values(default=1.0, soft_sphere=0.7)
+
+	#Considering heteroatoms and waters molecules
+	env.io.hetatm = env.io.water = True
+
+	# Directories with input atom files:
+	# env.io.atom_files_directory = './:../atom_files'
+
+	# Modelling 'sequence' with file.ali
+	a = AutoModel(env, alnfile='target_sequence-receptor_template.ali', knowns='receptor_templateA',
+				  sequence='target_sequence', assess_methods=(assess.DOPE, assess.GA341))
+
+	# Generating 3 models
+	a.starting_model = 1
+	a.ending_model = int(num_models)
+
+	# Very thorough Variable Target Function Method (VTFM) optimization:
+	a.library_schedule = autosched.slow
+	a.max_var_iterations = 300
+
+	# Thorough MD optimization:
+	a.md_level = refine.slow
+	 
+	# Repeat the whole cycle 2 times and do not stop unless obj.func. > 1E6
+	a.repeat_optimization = 2
+	a.max_molpdf = 1e6
+
+	a.make()
+
+	# Get a list of all successfully built models from a.outputs
+	ok_models = [x for x in a.outputs if x['failure'] is None]
+
+	# Rank the models by DOPE score
+	key = 'DOPE score'
+	ok_models.sort(key=lambda a: a[key])
+
+	# Get top model
+	m = ok_models[0]
+	print("Top model: %s (DOPE score %.100f)" % (m['name'], m[key]))
+
+	return m['name'], m[key]
+
+def align_2d(filestore):
+
+	log.none()
+
+	env = Environ()
+	aln = Alignment(env)
+	mdl = Model(env, file='receptor_template', model_segment=('FIRST:A','LAST:A'))
+	aln.append_model(mdl, align_codes='receptor_templateA', atom_files='receptor_template.pdb')
+	aln.append(file='target_sequence.pir', align_codes='target_sequence')
+	aln.align2d()
+	aln.write(file='target_sequence-receptor_template.ali', alignment_format='PIR')
+	aln.write(file='target_sequence-receptor_template.pap', alignment_format='PAP')
+
+def model_receptor(allele_sequence, peptide_sequence, filestore):
+
+	# Routine for finding the best sequence match for homology modelling, as well as modelling itself
+
+	# First we search for the closest sequence match
+	print("Searching for the closest match in terms of sequence:")
+	best_record_list = []
+	best_score = 0 
+	for seq_record in SeqIO.parse("./helper_files/template_sequences.fasta", "fasta"):
+
+		# Do a quick alignment
+		
+		alignments = pairwise2.align.globalxx(allele_sequence, str(seq_record.seq))
+		if(alignments[0].score == best_score):
+			best_record_list.append(seq_record.id)
+		if(alignments[0].score > best_score):
+			best_score = alignments[0].score
+			best_record_list = []
+			best_record_list.append(seq_record.id)
+	print(best_record_list)
+	print("Closest match are the following alleles: ", best_record_list)
+
+	# Secondly, emphasizing more on the peptide binding pocket, we fetch the pdb code that has the peptide
+	# with the closest sequence similarity to the peptide to be modelled. This is coming from the hypothesis that
+	# this structure will have similar binding cleft to accomodate the peptide?
+
+	# This is repeated code btw, see if you can make a function for this, it would be amazing
+	print("Fetching now the most appropriate template that will host the peptide in question:")
+	templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
+	templates = templates[templates['MHC'].isin(best_record_list)]
+	aligner = Align.PairwiseAligner()
+	aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
+	score_list = []
+	template_sequences = templates['peptide'].tolist()
+	for template_sequence in template_sequences:
+		score_list.append(aligner.score(peptide_sequence, template_sequence))
+	templates['peptide_score'] = score_list
+	templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
+	result = templates.sample(n=1)
+	pdb_filename = result['pdb_code'].values[0]
+	new_allotype = result['MHC'].values[0]
+	print("Got " + pdb_filename + "! This template has MHC " + new_allotype)
+	copy_file('./new_templates/' + pdb_filename, filestore + '/receptor_template.pdb')
+
+	# Now that we found the pdb that is serving as the HLA template, take the sequence of that template
+	# CAREFUL: the sequence is only the A-chain!
+	# Solution: Do a global alignment, where you penalize opening gaps, as such, the gap in the beginning is
+	# that weird starting aa seq, and ther gap in the end will be the B-chain.
+	# THINK ABOUT WHEN THIS FAILS!
+	for seq_record in SeqIO.parse("./helper_files/a_chain_sequences.fasta", "fasta"):
+		if seq_record.id == pdb_filename:
+			a_chain_alignment = pairwise2.align.globalxs(allele_sequence, str(seq_record.seq), open=-.5, extend=0)
+	original_sequence = list(str(a_chain_alignment[0][0]))
+	gapped_sequence = list(str(a_chain_alignment[0][1]))
+	filtered_sequence = [original_sequence[i] for i, x in enumerate(gapped_sequence) if x != '-']
+	filtered_sequence = "".join(filtered_sequence) + '*'
+	
+	wd_to_return_to = os.getcwd()
+	os.chdir(wd_to_return_to + '/' + filestore)
+
+	print("Preparing target sequence")
+	f = open("target_sequence.pir", 'w')
+	f.write(">P1;target_sequence\n")
+	f.write("sequence::	 : :	 : :::-1.00:-1.00\n")
+	f.write(filtered_sequence)
+	f.close()
+
+	align_2d(filestore)
+
+	print("Creating model")
+	starttime = time.time()	
+	best_model, best_score = model_single_opt(filestore, num_models=2)
+	endtime = time.time()
+	print("Homology modelling took " + str(endtime - starttime) + " seconds.")
+	os.chdir(wd_to_return_to)
+
+	return filestore + '/' + best_model, new_allotype
 
 class Receptor(object):
 
@@ -30,34 +183,51 @@ class Receptor(object):
 		return cls(allotype = "REDOCK", pdb_filename = peptide_input)
 
 	@classmethod
-	def fromallotype(cls, allotype):
+	def fromallotype(cls, allotype, peptide_sequence, filestore):
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./template_files/receptor-class-templates.csv")
-		if(allotype in templates['Allotype'].tolist()):
+		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
+		if(allotype in templates['MHC'].tolist()):
+
 			print("Allotype found in our structural DB!")
-			pdb_filename = templates[templates['Allotype'] == allotype]['Template'].values[0]
-			return(cls(allotype = allotype, pdb_filename = './templates/' + pdb_filename))
+			templates = templates[templates['MHC'] == allotype]
+
+			print("Will try to get the one that is closer to the peptide_input:")
+			# select the one closer to the whole sequence
+			aligner = Align.PairwiseAligner()
+			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
+			score_list = []
+			template_sequences = templates['peptide'].tolist()
+			for template_sequence in template_sequences:
+				score_list.append(aligner.score(peptide_sequence, template_sequence))
+			templates['peptide_score'] = score_list
+			templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
+			pdb_filename = templates['pdb_code'].sample(n=1).values[0]
+			print("Got " + pdb_filename + "!")
+			return(cls(allotype = allotype, pdb_filename = './new_templates/' + pdb_filename))
 		
-		# Check #2: Supertype representatives
-		print("Allotype not found in our structural DB. Will resort to modelling the structure...")
-		print(" Homology modelling (MODELLER) is used. Trying to fetch supertype representative as the template:")
-		supertypes = pd.read_csv("./template_files/supertype_templates.csv")
-		if(allotype in supertypes['Allotype'].tolist()):
-			print("Supertype for given allotype found in our DB!")
-			receptor_template = templates[templates['Allotype'] == allotype]['Template'].values[0]
-			print("Using " + receptor_class + "as a representative template for " + allotype)
-			
-		else:
-			print("Warning: Allele cannot be found in the supertype database ... Defaulting to 2v2w.pdb")
-			receptor_template = "./templates/2v2w/pdb"
-		##MODELLER FUNCTION CALL
-		return(cls(allotype = allotype, pdb_filename = pdb_filename))
+		# Check #2: Existing sequence
+		print("Allotype not found in our structural DB. Let's see if it's in our sequence DB...")
+		for seq_record in SeqIO.parse("./helper_files/MHC_data.fasta", "fasta"):
+			if seq_record.id == allotype:
+				print("Allotype found in our sequence DB! Modelling it through homology modelling:")
+				pdb_filename, new_allotype = model_receptor(str(seq_record.seq), peptide_sequence, filestore)
+				return(cls(allotype = new_allotype, pdb_filename = pdb_filename))
+
+		print("Allotype not found in our sequence DB... Please check the list of supported allotypes (or pass down a fasta sequence instead.")
+		print("Aborting....")
+		sys.exit(1)
 
 	@classmethod
-	def fromfasta(cls, sequence):
-		#Idea is to call the sequence similarity to fetch allele -> fetch representative -> MODELLER	
-		return cls(allotype = None, pdb_filename = None)
+	def fromfasta(cls, fasta_file, peptide_sequence, filestore):
+
+		# If multiple sequences appear in the fasta file, only the last one will be taken into account!
+		# The .fasta file location must also be in relation to the main directory. 
+
+		for seq_record in SeqIO.parse(fasta_file, "fasta"):
+			sequence = seq_record.seq
+		pdb_filename, new_allotype = model_receptor(str(sequence), peptide_sequence, filestore)
+		return(cls(allotype = new_allotype, pdb_filename = pdb_filename))
 
 	@staticmethod	
 	def load_flexible_residues():

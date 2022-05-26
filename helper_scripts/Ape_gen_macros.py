@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain
+from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain, pdb_rplchain
 
 from constraint import *
 
@@ -93,6 +93,12 @@ def merge_and_tidy_pdb(list_of_pdbs, dst):
 	with open(dst, 'w') as pdb_file:
 		pdb_file.write(''.join(reatomed))
 	pdb_file.close()
+
+def rename_chains(pdb_filename, chain_from, chain_to, dst):
+	renamed = pdb_rplchain.run(open(pdb_filename, 'r'), (chain_from, chain_to))
+	with open(dst, 'w') as file:
+		file.write(''.join(renamed))
+	file.close()
 
 def split_receptor_and_peptide(pdb_file):
 	pdb_path, pdb_filename = os.path.split(pdb_file)

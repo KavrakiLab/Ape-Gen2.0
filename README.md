@@ -46,6 +46,9 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Make `anchor tol` step optional
+- Add `num_of_rounds` in homology modelling as an argument. 
+- Make function in the places where there is repeated code (there is one on peptide similarity tempalte selection)
 - Have a `write_string` function for all the yields/joins/opens/writes in the code (or maybe for each function do this inside it, the file is overwritten successfully without defining a new one)
 - Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
@@ -60,15 +63,14 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 - `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
 - Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
 - Function documentation needs to be done thouroughly at some point
+- Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
 - Implement peptide template fetching: 
 	- RF for predicting anchors pending...
-	- Full policy needs to be implemented
-	- Change in template folders needs to happen
 - Implement HLA template fetching/generating:
-	- I don't think there is need for a supertype thing. Sequence matching will suffice, as we have A*02:06, A*02:07 now...
-- Change anchor tolerance to peptide template anchors instead of N0,N1,C-1,C0
+	- MODELLER output should go into a log file somehow
+	- MODELLER files go into a separate folder maybe (in the intermediate files)
 - Implement other inputs (native for REDOCK mode, HLA sequence, etc.)
 - Testing/Testing/Testing...
 

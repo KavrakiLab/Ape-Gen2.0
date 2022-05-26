@@ -21,13 +21,14 @@ from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
 
 class Peptide(object):
 
-	def __init__(self, pdb_filename, sequence):
+	def __init__(self, pdb_filename, sequence, anchors):
 		self.sequence = sequence
 		self.pdb_filename = pdb_filename
 		self.pdbqt_filename = None
+		self.anchors = anchors
 
 	@classmethod
-	def frompdb(cls, pdb_filename):
+	def frompdb(cls, pdb_filename, anchors):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -42,7 +43,7 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence)
+		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
 	
 	@classmethod
 	def fromsequence(cls, peptide_sequence):
@@ -55,17 +56,12 @@ class Peptide(object):
 	@classmethod
 	def fromsequence2(cls, peptide_sequence, receptor_allotype, anchors):
 
-		# Current policy of selecting/chosing templates is:
-		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches 
-		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
-		# 3) Select the one that is closer in terms of anchor residues
-		# 4) If there are duplicate results, select the one closer to the whole sequence
-		# 5) If there are duplicate results, select at random!
+		# Current policy of selecting/chosing peptide templates is:
 
 		sequence_length = len(re.sub('[a-z]', '', peptide_sequence)) # Remove PTMs when fetching the template
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
 
-		# 1)
+		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
 		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
 		# (maybe play with user input for now?)
 		if anchors == "":
@@ -76,7 +72,8 @@ class Peptide(object):
 		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
 		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
 
-		#2)
+		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
+		# What if the peptide motif does not exist for this particular
 		sub_alleles = pd.unique(templates['MHC']).tolist()
 		sub_alleles.append("Allele")
 		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
@@ -84,7 +81,7 @@ class Peptide(object):
 		similar_alleles = allele_of_interest[allele_of_interest == allele_of_interest.min().values[0]].dropna().index.values[0]
 		templates = templates[templates['MHC'] == similar_alleles]
 
-		# 3)
+		# 3) Select the one that is closer in terms of anchor residues
 		peptide_anchor_sequence = peptide_sequence[:2] + peptide_sequence[(len(peptide_sequence) - 2):]
 		template_anchor_sequences = (templates['peptide'].str[:2] + templates['peptide'].str[(len(peptide_sequence) - 2):]).tolist()
 		aligner = Align.PairwiseAligner()
@@ -95,7 +92,7 @@ class Peptide(object):
 		templates['anchor_score'] = score_list
 		templates = templates[templates['anchor_score'] == templates['anchor_score'].max()].dropna()
 
-		# 4)
+		# 4) If there are duplicate results, select the one closer to the whole sequence
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
 		for template_sequence in template_sequences:
@@ -103,10 +100,12 @@ class Peptide(object):
 		templates['peptide_score'] = score_list
 		templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
 
-		# 5)
+		# 5) If there are duplicate results, select at random!
 		peptide_template = templates['pdb_code'].sample(n=1).values[0]
 		
-		return cls(pdb_filename = ('./new_templates/' + peptide_template), sequence = peptide_sequence)
+		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
+			       sequence = peptide_sequence, 
+			       anchors = [int(anchor) for anchor in anchors.split(",")])
 
 	def add_sidechains(self, filestore, peptide_index):
 		fixer = PDBFixer(filename=self.pdb_filename)
@@ -228,8 +227,7 @@ class Peptide(object):
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 
 		# Only anchors
-		anchors = np.array([1, 2, len(self.sequence) - 1, len(self.sequence)])
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(anchors)]
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.anchors)]
 		
 		# Only carbon-alpha atoms
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'] == 'CA']
@@ -259,10 +257,10 @@ class Peptide(object):
 			
 			# Keep a log for the anchor difference
 			with open(filestore + "/Anchor_filtering/peptide_" + str(peptide_index) + ".log", 'a+') as anchor_log:
-				anchor_log.write(str(current_round) + "," + str(peptide_index) + "," + str(anchor_difference[0]) + "," + str(anchor_difference[1]) + "," + str(anchor_difference[2]) + "," + str(anchor_difference[3])) 
+				anchor_log.write(str(current_round) + "," + str(peptide_index) + "," + ','.join(map(str, anchor_difference))) 
 			
 			# Keep this result for final printing
-			faulty_positions = (anchor_difference > anchor_tol)*anchors
+			faulty_positions = (anchor_difference > anchor_tol)*self.anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
 			with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
@@ -317,13 +315,16 @@ class Peptide(object):
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			try:
+				print(CA_loc, C_loc)
 				matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
+				print(matching)
+				input()
 			except IndexError:
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
 				os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
 				with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'a+') as flexible_log:
 					flexible_log.write(str(current_round) + "," + str(peptide_index) + ",Flexible receptor conformation received was faulty,-\n") 
-				return
+				return True
 
 			sub_pdb = sub_pdb.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
 			list_of_dataframes.append(sub_pdb)	
@@ -343,6 +344,8 @@ class Peptide(object):
 							filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb"],
 							minimized_receptor_loc)
 		os.remove(filestore + "/temp_" + str(peptide_index) + ".pdb")
+
+		return False
 
 	def create_peptide_receptor_complexes(self, filestore, receptor, peptide_index):
 

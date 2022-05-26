@@ -39,14 +39,17 @@ class pMHC(object):
 		p1.cmd.load(self.pdb_filename, "mobile")
 		p1.cmd.load(reference.pdb_filename, "ref")
 
-		p1.cmd.align("mobile & (chain A | chain B)", "ref & (chain A | chain B)")
+		p1.cmd.align("mobile & chain A", "ref & chain A")
 
 		self.pdb_filename = filestore + '/alignment_files/receptor.pdb'
 		p1.cmd.save(self.pdb_filename, "mobile")
 		p1.cmd.save(filestore + '/alignment_files/peptide.pdb', "ref")
 
 		# Also store receptor without peptide and keep that on the receptor part
-		p1.cmd.create("mobile_sans_peptide", "mobile & (chain A | chain B)")
+		# CAUTION: If receptor template is a result of homology modelling, the peptide is ignored there, so
+		# the receptor will already be without a peptide to begin with. This does not affect this step at all
+		# however
+		p1.cmd.create("mobile_sans_peptide", "mobile & chain A")
 		self.receptor.pdb_filename = filestore + '/alignment_files/receptor_sans_peptide.pdb'
 		p1.cmd.save(self.receptor.pdb_filename, "mobile_sans_peptide")
 
@@ -59,7 +62,7 @@ class pMHC(object):
 		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
 		fixer.findMissingAtoms()
 		fixer.addMissingAtoms()
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
+		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'), keepIds=True)
 
 	def prepare_for_RCD(self, reference, filestore, pep_seq):
 
@@ -84,22 +87,41 @@ class pMHC(object):
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 
 		# Only peptide
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C'] 
-
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
+		
 		# RCD config -> I think I must include this for residue replacement to work and for no other reason
 		# These are also the atoms that I am playing with in RCD (I don't need any others)
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'].isin(['N', 'CA', 'C', 'O', 'CB'])]
 
-		# Here, I am replacing the residues of the template peptide with the residues of the given peptide.
-		for i in range(0, len(pep_seq)):
-			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == i + 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[i]]
+		# It is important here to ensure that the peptide template length and the peptide tomodel length are equal
+		# If the length of the template is larger, we need to remove amino acids (removing the middle ones)
+		# If the length of the template is smaller, we need to add aminoacids
+
+		# Here, I am replacing the (anchor) residues of the template peptide with the residues of the given peptide.
+		# Note to self: I don't think I need to replace for the other residues, as this is something RCD takes care of
+		template_peptide_len = pdb_df_peptide['residue_number'].max()
+		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[0]]
+		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 2, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[1]]
+		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len - 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[len(pep_seq) - 2]]
+		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[len(pep_seq) - 1]]
 		
+		# Removing all middle amino-acids (they will be filled by RCD):
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin([1, 2, template_peptide_len - 1, template_peptide_len])]
+
+		# But need to re-index those with the peptide length that I want to model in order for RCD to work:
+		# In order to not mess up re-indexing, I need to keep as a reference the atom indexes, which are unique
+		atom_indexes = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len - 1]['atom_number'].values
+		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes), 'residue_number'] = len(pep_seq) - 1
+		atom_indexes = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len]['atom_number'].values
+		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes), 'residue_number'] = len(pep_seq)
+
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
 		anchor_pdb = filestore + '/input_to_RCD/peptide.pdb'
 		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
 
 		# Finally, merge those two to create the anchored MHC (peptide contains only the anchors)
+		# We need to rename B to C, because for some reason C becomes B
 		anchored_MHC_file_name = filestore + '/input_to_RCD/anchored_pMHC.pdb'
 		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
 		self.pdb_filename = anchored_MHC_file_name
@@ -110,10 +132,10 @@ class pMHC(object):
 		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/N_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
 
-		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == len(reference.peptide.sequence)]
+		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == len(pep_seq)]
 		ppdb_peptide.df['ATOM'] = C_terminus
 		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/C_ter.pdb', 
-						    records=['ATOM'], gz=False, append_newline=True)
+							records=['ATOM'], gz=False, append_newline=True)
 
 		# DONE!
 
@@ -140,7 +162,7 @@ class pMHC(object):
 		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
 		os.remove(filestore + '/../../results.txt')
 
-	def set_anchor_xyz(self, reference, pep_seq):
+	def set_anchor_xyz(self, reference, pep_seq, anchors):
 
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(reference.pdb_filename)
@@ -150,7 +172,7 @@ class pMHC(object):
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C'] 
 
 		# Only anchors
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin([1, 2, len(pep_seq) - 1, len(pep_seq)])]
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(anchors)]
 
 		# Only carbon-alpha atoms
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'] == 'CA']
