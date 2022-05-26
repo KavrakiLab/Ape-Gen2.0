@@ -103,7 +103,8 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
+def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, anchors, 
+								   peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
 	new_filestore = filestore + '/SMINA_data'
@@ -114,7 +115,7 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	Cterm_location = filestore + '/input_to_RCD/C_ter.pdb'
 	assembled_peptide = new_filestore + '/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
-	peptide = Peptide.frompdb(assembled_peptide)
+	peptide = Peptide.frompdb(assembled_peptide, anchors = anchors)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.add_sidechains(new_filestore, peptide_index)
@@ -134,8 +135,12 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
 	if(peptide_is_not_valid): return
 
+	input()
+
 	# 6. Fix flexible residue co-ordinates if receptor is flexible
-	if receptor.doMinimization: peptide.fix_flexible_residues(new_filestore, receptor, peptide_index, current_round)
+	if receptor.doMinimization:
+		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, peptide_index, current_round)
+		if(peptide_is_not_valid): return
 
 	# 7. Create the peptide + MHC ensemble files
 	peptide.create_peptide_receptor_complexes(new_filestore, receptor, peptide_index)
@@ -209,13 +214,14 @@ def apegen(args):
 
     # 1a. Receptor
 	if debug: print("Processing Receptor Input")
+	initialize_dir(temp_files_storage +  '/MODELLER_output')
 	if receptor_class.endswith(".pdb"):
 		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
 		receptor = Receptor.frompdb(receptor_class)
 		receptor_template_file = receptor_class
 	elif receptor_class.endswith(".fasta"):
 		# If this is a sequence, the template is taken by MODELLER
-		receptor = Receptor.fromfasta(receptor_class)
+		receptor = Receptor.fromfasta(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output')
 		receptor_template_file = receptor.pdb_filename
 	elif receptor_class == "REDOCK":
 		# If REDOCK, the receptor template is the peptide template!
@@ -223,7 +229,7 @@ def apegen(args):
 		receptor_template_file = peptide.pdb_filename
 	else:
 		# If this is an allotype specification, fetch template like the peptide!
-		receptor = Receptor.fromallotype(receptor_class)
+		receptor = Receptor.fromallotype(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output')
 		receptor_template_file = receptor.pdb_filename
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
@@ -239,11 +245,12 @@ def apegen(args):
 	if debug: print("Processing Peptide Input")
 	if peptide_input.endswith(".pdb"):
 		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
-		peptide = Peptide.frompdb(peptide_input)
+		# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
+		peptide = Peptide.frompdb(peptide_input, anchors = "") 
 	else:
 		# Fetch template from peptide template list
 		# peptide = Peptide.fromsequence(peptide_input)
-		peptide = Peptide.fromsequence2(peptide_input, receptor_class, anchors)
+		peptide = Peptide.fromsequence2(peptide_input, receptor.allotype, anchors)
 
 	# Peptide Template is also a pMHC complex though	
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
@@ -257,6 +264,8 @@ def apegen(args):
 		print("Peptide Successfully Processed")
 		print("Peptide Sequence: " + peptide.sequence)
 		print("Peptide Template: " + peptide_template.pdb_filename)
+		print("Peptide Anchors:")
+		print(peptide.anchors)
 		print("Peptide PTMs:")
 		print(PTM_list)
 
@@ -290,7 +299,6 @@ def apegen(args):
 		if debug: print("Performing RCD")
 		receptor_template.RCD(peptide, RCD_dist_tol, num_loops, filestore)
 
-
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/SMINA_data')
@@ -301,7 +309,8 @@ def apegen(args):
 		# Get peptide template anchor positions for anchor tolerance filtering
 		if debug: print("Extract peptide template anchors for anchor tolerance filtering")
 		peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template, 
-																	   pep_seq = peptide.sequence)
+																	   pep_seq = peptide.sequence,
+																	   anchors = peptide.anchors)
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
 		if debug: print("Performing peptide refinement and scoring. This may take a while...")
@@ -317,10 +326,10 @@ def apegen(args):
 		initialize_dir(filestore + '/SMINA_data/Anchor_filtering')
 		initialize_dir(filestore + '/SMINA_data/pMHC_complexes/')
 
-		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide_template_anchors_xyz, anchor_tol, current_round), 
+		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
-		with WorkerPool(n_jobs=num_cores) as pool:
-			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
+		#with WorkerPool(n_jobs=num_cores) as pool:
+		#	results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
 
 		initialize_dir(filestore + '/Final_conformations/')
 
@@ -331,14 +340,14 @@ def apegen(args):
 		# with open(filestore + '/SMINA_data/PTMed_peptides/ensemble.pdb', 'w') as anchored_MHC_file:
 		#	anchored_MHC_file.write(''.join(ensembled))
 
-		# Code for non-parallel execution 
+		# Code for non-parallel execution and debugging
 
-		#for argument in arg_list:
-			#print(argument)
-		#	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6])
+		for argument in arg_list:
+			print(argument)
+			peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7])
 
 		# Print and keep statistics
-		best_conf_dir = filestore + '/SMINA_data/'
+		best_conf_dir = filestore + '/SMINA_data'
 		print("\n\nEnd of main workflow of round no. " + str(current_round) + "!!!")
 		create_csv_from_list_of_files(filestore + '/SMINA_data/total_results.csv', glob.glob(filestore + '/SMINA_data/per_peptide_results/*.log'))
 		results_csv = pretty_print_analytics(filestore + '/SMINA_data/total_results.csv')
@@ -393,7 +402,7 @@ def apegen(args):
 								filestore + '/Final_conformations/',
 								query="pMHC_")
 
-			best_conf_dir = filestore + '/OpenMM_confs/'
+			best_conf_dir = filestore + '/OpenMM_confs'
 			print("\n\nEnd of OpenMM step of round no. " + str(current_round) + "!!!")
 			create_csv_from_list_of_files(filestore + '/OpenMM_confs/total_results.csv', glob.glob(filestore + '/OpenMM_confs/per_peptide_results/*.log'))
 			results_csv = pretty_print_analytics(filestore + '/OpenMM_confs/total_results.csv')
