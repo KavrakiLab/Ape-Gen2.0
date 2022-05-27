@@ -7,7 +7,7 @@ import sys
 import os
 import re
 
-from helper_scripts.Ape_gen_macros import all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -66,7 +66,9 @@ class Peptide(object):
 		# (maybe play with user input for now?)
 		if anchors == "":
 			#anchors = RF # to be continued...
+			
 			anchors = "2,9"
+		print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, peptide_sequence)
 		templates['anchor_not'] = templates['anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
@@ -100,11 +102,24 @@ class Peptide(object):
 		templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
 
 		# 5) If there are duplicate results, select at random!
-		peptide_template = templates['pdb_code'].sample(n=1).values[0]
+		final_selection = templates.sample(n=1)
+		peptide_template = final_selection['pdb_code'].values[0]
+		template_peptide_length = final_selection['peptide_length'].values[0]
+		template_anchors_not = final_selection['anchor_not'].values[0] 
 		
+		# 6) Before the end, it is a good idea here to match the predicted/set anchors of the peptide
+		# with the anchors of the template for the anchor tolerance step. General workflow is:
+		# A) Take intersection of anchor notation (this will force equal number of anchors)
+		# B) Sort
+		# C) Extract the numbers using the peptide lengths
+
+		anchor_union = list(anchors_not.intersection(template_anchors_not))
+		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in anchor_union])
+		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(len(peptide_sequence))] for anchor in anchor_union])
+
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
 			       sequence = peptide_sequence, 
-			       anchors = [int(anchor) for anchor in anchors.split(",")])
+			       anchors = peptide_anchors), template_anchors
 
 	def add_sidechains(self, filestore, peptide_index):
 		fixer = PDBFixer(filename=self.pdb_filename)

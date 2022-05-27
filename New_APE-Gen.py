@@ -248,10 +248,16 @@ def apegen(args):
 	else:
 		# Fetch template from peptide template list
 		# peptide = Peptide.fromsequence(peptide_input)
-		peptide = Peptide.fromsequence2(peptide_input, receptor.allotype, anchors)
+		peptide, template_anchors = Peptide.fromsequence2(peptide_input, receptor.allotype, anchors)
 
 	# Peptide Template is also a pMHC complex though	
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
+
+	# Get peptide template anchor positions for anchor tolerance filtering
+	if debug: print("Extract peptide template anchors for anchor tolerance filtering")
+	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template, 
+																   pep_seq = peptide.sequence,
+																   anchors = template_anchors)
 
 	# The reason that we calculate the PTMs list here and not in the Peptide class is because we need it to be a
 	# global variable to pass it on all peptide instances that need to be PTMed
@@ -303,12 +309,6 @@ def apegen(args):
 		receptor = receptor_template.receptor
 		receptor.add_sidechains(filestore)
 		receptor.prepare_for_scoring(filestore + "/SMINA_data")
-
-		# Get peptide template anchor positions for anchor tolerance filtering
-		if debug: print("Extract peptide template anchors for anchor tolerance filtering")
-		peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template, 
-																	   pep_seq = peptide.sequence,
-																	   anchors = peptide.anchors)
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
 		if debug: print("Performing peptide refinement and scoring. This may take a while...")

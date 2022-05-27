@@ -69,8 +69,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 #### Major issues:
 - Implement peptide template fetching: 
 	- RF for predicting anchors pending...
-- Anchor tolerance anchors are not the correct ones, fix those. 
-- Implement other inputs (native for REDOCK mode, HLA sequence, etc.)
+- Implement HLA .pdb input (discuss about maybe dropping the "REDOCK" option)
 - Testing/Testing/Testing...
 
 ### PTMs:
