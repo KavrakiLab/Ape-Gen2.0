@@ -248,7 +248,7 @@ def apegen(args):
 	else:
 		# Fetch template from peptide template list
 		# peptide = Peptide.fromsequence(peptide_input)
-		peptide, template_anchors = Peptide.fromsequence2(peptide_input, receptor.allotype, anchors)
+		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
 
 	# Peptide Template is also a pMHC complex though	
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 

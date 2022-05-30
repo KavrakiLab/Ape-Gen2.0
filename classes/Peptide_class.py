@@ -1,13 +1,16 @@
 import pandas as pd
-from biopandas.pdb import PandasPdb
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier
+
+from biopandas.pdb import PandasPdb
 from Bio import Align
 
 import sys
 import os
 import re
+import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -54,22 +57,41 @@ class Peptide(object):
 		return cls(pdb_filename = ('./templates/' + peptide_template), sequence = peptide_sequence)
 
 	@classmethod
-	def fromsequence2(cls, peptide_sequence, receptor_allotype, anchors):
+	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors):
 
 		# Current policy of selecting/chosing peptide templates is:
-
-		sequence_length = len(re.sub('[a-z]', '', peptide_sequence)) # Remove PTMs when fetching the template
+		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
+		sequence_length = len(re.sub('[a-z]', '', peptide_sequence_noPTM)) 
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
 
 		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
 		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
 		# (maybe play with user input for now?)
 		if anchors == "":
-			#anchors = RF # to be continued...
 			
-			anchors = "2,9"
+			print("Determining anchors for given peptide sequence and allele allotype")
+			# Load the MHCflurry frequencies
+			frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
+			frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
+			frequencies['X'] = np.zeros(frequencies.shape[0])
+			frequencies_alleles = pd.unique(frequencies['allele'])
+
+			if receptor_allotype in frequencies_alleles:
+				print("Receptor allotype has a known MHC binding motif!")
+				peptide_features = extract_features(peptide_sequence_noPTM, receptor_allotype, frequencies)
+				anchor_predictors = pkl.load(open("./helper_files/anchor_predictors.pkl", "rb"))
+				predictions = np.zeros(sequence_length)
+				for i in range(len(anchor_predictors[0])):
+					predictions += anchor_predictors[0][i].predict(np.vstack(peptide_features))
+				predictions /= len(anchor_predictors[0])
+				anchors = list(np.argwhere(predictions >= 0.5).flatten() + 1)
+				anchors = ",".join(map(str, anchors))
+			else:
+				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
+				anchors = "2,9"
+
 		print("Predicted anchors for the peptide: ", anchors)
-		anchors_not = process_anchors(anchors, peptide_sequence)
+		anchors_not = process_anchors(anchors, peptide_sequence_noPTM)
 		templates['anchor_not'] = templates['anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
 		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
@@ -83,8 +105,8 @@ class Peptide(object):
 		templates = templates[templates['MHC'] == similar_alleles]
 
 		# 3) Select the one that is closer in terms of anchor residues
-		peptide_anchor_sequence = peptide_sequence[:2] + peptide_sequence[(len(peptide_sequence) - 2):]
-		template_anchor_sequences = (templates['peptide'].str[:2] + templates['peptide'].str[(len(peptide_sequence) - 2):]).tolist()
+		peptide_anchor_sequence = peptide_sequence_noPTM[:2] + peptide_sequence_noPTM[(sequence_length - 2):]
+		template_anchor_sequences = (templates['peptide'].str[:2] + templates['peptide'].str[(sequence_length - 2):]).tolist()
 		aligner = Align.PairwiseAligner()
 		aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
 		score_list = []
@@ -97,7 +119,7 @@ class Peptide(object):
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
 		for template_sequence in template_sequences:
-			score_list.append(aligner.score(peptide_sequence, template_sequence))
+			score_list.append(aligner.score(peptide_sequence_noPTM, template_sequence))
 		templates['peptide_score'] = score_list
 		templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
 
@@ -112,10 +134,9 @@ class Peptide(object):
 		# A) Take intersection of anchor notation (this will force equal number of anchors)
 		# B) Sort
 		# C) Extract the numbers using the peptide lengths
-
 		anchor_union = list(anchors_not.intersection(template_anchors_not))
 		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in anchor_union])
-		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(len(peptide_sequence))] for anchor in anchor_union])
+		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchor_union])
 
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
 			       sequence = peptide_sequence, 

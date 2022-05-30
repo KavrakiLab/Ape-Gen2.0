@@ -8,6 +8,7 @@ from subprocess import call
 import sys
 import os
 import time
+import re
 
 from Bio import Align
 from Bio import SeqIO
@@ -184,6 +185,9 @@ class Receptor(object):
 
 	@classmethod
 	def fromallotype(cls, allotype, peptide_sequence, filestore):
+
+		# Pre-process: Remove any PTMs from the peptide sequence:
+		peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")

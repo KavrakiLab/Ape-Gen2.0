@@ -110,10 +110,10 @@ class pMHC(object):
 
 		# But need to re-index those with the peptide length that I want to model in order for RCD to work:
 		# In order to not mess up re-indexing, I need to keep as a reference the atom indexes, which are unique
-		atom_indexes = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len - 1]['atom_number'].values
-		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes), 'residue_number'] = len(pep_seq) - 1
-		atom_indexes = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len]['atom_number'].values
-		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes), 'residue_number'] = len(pep_seq)
+		atom_indexes_c1 = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len - 1]['atom_number'].values
+		atom_indexes_c = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len]['atom_number'].values
+		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes_c1), 'residue_number'] = len(pep_seq) - 1
+		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes_c), 'residue_number'] = len(pep_seq)
 
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide

@@ -9,7 +9,7 @@ docker build . -t kavrakilab/apegen2.0
 
 works. After this, just running the .sh file gets you into the container, and Ape-Gen can be run from there. 
 
-An additional step is required here: One needs to go to:
+Two additional step are required here: One needs to go to:
 
 ```
 cd /conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/
@@ -32,6 +32,22 @@ if o in ('-l', '--l'):
 ```
 Not sure why this is happening in autodocktools, will see if I can manually overwrite the file while building the image. 
 
+Secondly, to give a valid MODELLER key, one needs to go to:
+
+```
+cd /conda/envs/apegen/lib/modeller-10.2/modlib/modeller/
+```
+
+and modify the lines of `config.py` with a valid MODELLER key. Contact the lab to get a valid key.
+
+Finally, download the files from this link:
+
+```
+https://rice.box.com/s/q4bh18eqvmvpzulqyfoszebo9jfkivc3
+```
+
+and put them in the helper files folder, as these are mandatory for the anchor prediction step!
+
 
 For now, peptide sequence (along with phosphorylated positions) + HLA allotype works, but native + other types of inputs will follow:
 
@@ -46,6 +62,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Locate all the PTM removal regex expressions and make a function instead
+- Make homology modelling into a different script in order not to ask for MODELLER keys for cases where HLA allotype has a known structure.
 - Double check on how the flexible residue code assignment works, because it may attempt to enter the `minimized_receptors` folder without a successfull CSP assignment.
 - Make `anchor tol` step optional.
 - Add `num_of_rounds` in homology modelling as an argument. 
@@ -67,9 +85,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Implement peptide template fetching: 
-	- RF for predicting anchors pending...
-- Implement HLA .pdb input (discuss about maybe dropping the "REDOCK" option)
 - Testing/Testing/Testing...
 
 ### PTMs:
