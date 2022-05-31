@@ -226,25 +226,25 @@ class Peptide(object):
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
         		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
+        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
         		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
         		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
         		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
         		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
         		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
+        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
         		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
         		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
         		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
         		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
