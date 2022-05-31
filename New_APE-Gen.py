@@ -1,5 +1,5 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
+from helper_scripts.Ape_gen_macros import replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -18,14 +18,20 @@ from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
 
-def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol):
+def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, anchors):
 
 	new_filestore = filestore + '/OpenMM_confs'
 
-	# 1. Separate the peptide from the MHC
+	# 1. Rename B chain to C chain
+	rechained = replace_chains(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", "B", "C")
+	overwritten = ''.join(rechained)
+	with open(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", 'w') as minimized_file:
+		minimized_file.write(overwritten)
+
+	# 2. Separate the peptide from the MHC
 	receptor_file, peptide_file = split_receptor_and_peptide(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb")
 
-	# 2. Prepare Receptor for Scoring
+	# 3. Prepare Receptor for Scoring
 	overwritten = remove_remarks_and_others_from_pdb(receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
 	overwritten = ''.join(overwritten)
 	with open(receptor_file, 'w') as receptor_handler:
@@ -47,20 +53,20 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 		peptide_handler.write(overwritten)
 	peptide_handler.close()
 	
-	peptide = Peptide.frompdb(peptide_file)
+	peptide = Peptide.frompdb(peptide_file, anchors = anchors)
 	peptide.sequence = re.sub('[a-z]', '', peptide.sequence) # Remove PTMs from the sequence
 
-	# 2. Re-score with SMINA (enforce no further minimization)
+	# 4. Re-score with SMINA (enforce no further minimization)
 	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, conf_index, current_round)
 	if(peptide_is_not_valid): return
 
 	peptide.score_with_SMINA(new_filestore, receptor, conf_index) 
 
-	# 3. Anchor filtering step (probably not needed, anchors are not moving that much)
+	# 5. Anchor filtering step (probably not needed, anchors are not moving that much)
 	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, conf_index, current_round)
 	if(peptide_is_not_valid): return
 
-	# 4. Create the peptide + MHC ensemble files (Already have those but ok...)
+	# 6. Create the peptide + MHC ensemble files (Already have those but ok...)
 	peptide.create_peptide_receptor_complexes(new_filestore, receptor, conf_index)
 
 	# Done!
@@ -392,7 +398,7 @@ def apegen(args):
 
 			# Rescoring and re-filtering resulting conformations
 			if debug: print("\nRescoring and re-filtering resulting conformations:")
-			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol), successful_confs))
+			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, peptide.anchors), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=True)
 
