@@ -5,18 +5,22 @@ import re
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain, pdb_rplchain
+from Bio.Align import substitution_matrices
 
 from constraint import *
+
+from nltk import ngrams
 
 ## MACROS
 
 # Three-to-one (and vice versa) AA transformation
 standard_three_to_one_letter_code = {'ARG':'R', 'HIS':'H', 'LYS':'K', 'ASP':'D', 'GLU':'E', \
-		                  			 'SER':'S', 'THR':'T', 'ASN':'N', 'GLN':'Q', 'CYS':'C', \
-		                  			 'GLY':'G', 'PRO':'P', 'ALA':'A', 'VAL':'V', 'ILE':'I', \
-		                  			 'LEU':'L', 'MET':'M', 'PHE':'F', 'TYR':'Y', 'TRP':'W'}
+						  			 'SER':'S', 'THR':'T', 'ASN':'N', 'GLN':'Q', 'CYS':'C', \
+						  			 'GLY':'G', 'PRO':'P', 'ALA':'A', 'VAL':'V', 'ILE':'I', \
+						  			 'LEU':'L', 'MET':'M', 'PHE':'F', 'TYR':'Y', 'TRP':'W'}
 standard_one_to_three_letter_code = {value: key for key, value in standard_three_to_one_letter_code.items()}
 
 
@@ -28,21 +32,37 @@ all_one_to_three_letter_codes = dict(standard_one_to_three_letter_code, **non_st
 
 
 anchor_dictionary = {'8': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3',
-				           '5': 'C_-3', '6': 'C_-2', '7': 'C_-1', '8': 'C_+0'},
-		             '9': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
-				           '6': 'C_-3', '7': 'C_-2', '8': 'C_-1', '9': 'C_+0'},
-			         '10': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
-				           '6': 'C_-4', '7': 'C_-3', '8': 'C_-2', '9': 'C_-1', '10': 'C_+0'},
-			         '11': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
-				           '7': 'C_-4', '8': 'C_-3', '9': 'C_-2', '10': 'C_-1', '11': 'C_+0'},
-			         '12': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
-				           '7': 'C_-5', '8': 'C_-4', '9': 'C_-3', '10': 'C_-2', '11': 'C_-1', '12': 'C_+0'},
-			         '13': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
-				           '8': 'C_-5', '9': 'C_-4', '10': 'C_-3', '11': 'C_-2', '12': 'C_-1', '13': 'C_+0'},
-			         '14': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
-				           '8': 'C_-6', '9': 'C_-5', '10': 'C_-4', '11': 'C_-3', '12': 'C_-2', '13': 'C_-1', '14': 'C_+0'},
-			         '15': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6', '8': 'N_+7',
-				           '9': 'C_-6', '10': 'C_-5', '11': 'C_-4', '12': 'C_-3', '13': 'C_-2', '14': 'C_-1', '15': 'C_+0'}}
+						   '5': 'C_-3', '6': 'C_-2', '7': 'C_-1', '8': 'C_+0'},
+					 '9': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
+						   '6': 'C_-3', '7': 'C_-2', '8': 'C_-1', '9': 'C_+0'},
+					 '10': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4',
+						   '6': 'C_-4', '7': 'C_-3', '8': 'C_-2', '9': 'C_-1', '10': 'C_+0'},
+					 '11': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
+						   '7': 'C_-4', '8': 'C_-3', '9': 'C_-2', '10': 'C_-1', '11': 'C_+0'},
+					 '12': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5',
+						   '7': 'C_-5', '8': 'C_-4', '9': 'C_-3', '10': 'C_-2', '11': 'C_-1', '12': 'C_+0'},
+					 '13': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
+						   '8': 'C_-5', '9': 'C_-4', '10': 'C_-3', '11': 'C_-2', '12': 'C_-1', '13': 'C_+0'},
+					 '14': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6',
+						   '8': 'C_-6', '9': 'C_-5', '10': 'C_-4', '11': 'C_-3', '12': 'C_-2', '13': 'C_-1', '14': 'C_+0'},
+					 '15': {'1': 'N_+0', '2': 'N_+1', '3': 'N_+2', '4': 'N_+3', '5': 'N_+4', '6': 'N_+5', '7': 'N_+6', '8': 'N_+7',
+						   '9': 'C_-6', '10': 'C_-5', '11': 'C_-4', '12': 'C_-3', '13': 'C_-2', '14': 'C_-1', '15': 'C_+0'}}
+
+rev_anchor_dictionary = {'N_+0' : {'8': 1, '9': 1, '10': 1, '11': 1, '12': 1, '13': 1, '14': 1, '15': 1},
+						 'N_+1' : {'8': 2, '9': 2, '10': 2, '11': 2, '12': 2, '13': 2, '14': 2, '15': 2},
+						 'N_+2' : {'8': 3, '9': 3, '10': 3, '11': 3, '12': 3, '13': 3, '14': 3, '15': 3},
+						 'N_+3' : {'8': 4, '9': 4, '10': 4, '11': 4, '12': 4, '13': 4, '14': 4, '15': 4},
+						 'N_+4' : {'8': 5, '9': 5, '10': 5, '11': 5, '12': 5, '13': 5, '14': 5, '15': 5},
+						 'N_+5' : {'8': 6, '9': 6, '10': 6, '11': 6, '12': 6, '13': 6, '14': 6, '15': 6},
+						 'N_+6' : {'8': 7, '9': 7, '10': 7, '11': 7, '12': 7, '13': 7, '14': 7, '15': 7},
+						 'N_+7' : {'8': 8, '9': 8, '10': 8, '11': 8, '12': 8, '13': 8, '14': 8, '15': 8},
+						 'C_-6' : {'8': 2, '9': 3, '10': 4, '11': 5, '12': 6, '13': 7, '14': 8, '15': 9},
+						 'C_-5' : {'8': 3, '9': 4, '10': 5, '11': 6, '12': 7, '13': 8, '14': 9, '15': 10},
+						 'C_-4' : {'8': 4, '9': 5, '10': 6, '11': 7, '12': 8, '13': 9, '14': 10, '15': 11},
+						 'C_-3' : {'8': 5, '9': 6, '10': 7, '11': 8, '12': 9, '13': 10, '14': 11, '15': 12},
+						 'C_-2' : {'8': 6, '9': 7, '10': 8, '11': 9, '12': 10, '13': 11, '14': 12, '15': 13},
+						 'C_-1' : {'8': 7, '9': 8, '10': 9, '11': 10, '12': 11, '13': 12, '14': 13, '15': 14},
+						 'C_+0' : {'8': 8, '9': 9, '10': 10, '11': 11, '12': 12, '13': 13, '14': 14, '15': 15}}
 
 ## FUNCTIONS
 
@@ -59,8 +79,8 @@ def process_anchors(anchors, pep_seq):
 
 def jaccard_distance(a, b):
 	# Computes jaccard distance between 2 sets
-    c = a.intersection(b)
-    return float(len(c)) / (len(a) + len(b) - len(c))
+	c = a.intersection(b)
+	return float(len(c)) / (len(a) + len(b) - len(c))
 
 def initialize_dir(dirname):
 	if os.path.exists(dirname):
@@ -154,7 +174,7 @@ def delete_elements(pdb_file, element_set, chains, residues):
 				continue
 		yield line
 	fhandle.close()
-       
+	   
 def create_csv_from_list_of_files(csv_filename, list_of_files):
 	with open(csv_filename, 'wb') as outfile:
 		for filename in list_of_files:
@@ -286,14 +306,14 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 				 'ILE':[["CA", "C", "CB", "CG1", "CG2", "CD"]],
 				 'LEU':[["CA", "C", "CB", "CG", "CD1", "CD2"]],
 				 'MET':[["CA", "C", "CB", "CG", "SD", "CE"]],
-			     'PHE':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"]],
+				 'PHE':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"]],
 				 'TYR':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "HH"]],
 				 'TRP':[["CA", "C", "CB", "CG", "CD1", "CD2", "NE1", "HE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]],
 				 'SER':[["CA", "C", "CB", "OG", "HG1"]],
 				 'THR':[["CA", "C", "CB", "OG1", "HG1", "CG2"]],
 				 'ASN':[["CA", "C", "CB", "CG", "OD1", "ND2", "HD21", "HD22"]],
 				 'GLN':[["CA", "C", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"]],
-				 'CYS':[["CA", "C", "CB", "SG"]],
+				 'CYS':[["CA", "C", "CB", "SG", "HG1"]],
 				 'GLY':[["CA", "C"]],
 				 'PRO':[["CA", "C", "CB", "CG", "CD"]],
 				 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"]],
@@ -302,7 +322,7 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 				 'LYS':[["CA", "C", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2", "HZ3"]],
 				 'ASP':[["CA", "C", "CB", "CG", "OD1", "OD2"]],
 				 'GLU':[["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]]
-			    }
+				}
 
 	constraint_dict = {'ALA':[[["CA", "C"], ["CA", "CB"]]],
 					   'VAL':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"]]],
@@ -392,3 +412,68 @@ def merge_connect_fields(list_of_pdbs, dst):
 	with open(dst, 'w') as pdb_file:
 		pdb_file.write(''.join(sorteded))
 	pdb_file.close()
+
+
+
+## FEATURE EXTRACTION FOR RF INPUT
+
+def extract_positions(position, peptide, feature_size):
+	scale = range(-int(np.floor(feature_size/2)), int(np.floor(feature_size/2)) + 1)
+	position_list = []
+	append_left = 0
+	append_right = 0
+	for x in scale:
+		if (position + x < 1):
+			position_list.append(0)
+			append_left += 1
+		elif (position + x > len(peptide)):
+			position_list.append(0)
+			append_right += 1
+		else:
+			position_list.append(position + x)
+	return position_list, append_left, append_right
+
+def extract_features(peptide, MHC, frequencies):
+
+	# Parameters (that more or less give the best RF performance)
+	windows_size = 5
+	feature_size = 5
+	wind = int(np.floor(windows_size/2))
+
+	# Loading the BLOSUM62 matrix
+	substitution_matrix = substitution_matrices.load("BLOSUM62")
+	substitution_matrix['X'] = substitution_matrix['*'] # X seems to be something else?
+
+	# Extract Ngram subsequences
+	aa_neighbors = [''.join(w) for w in list(ngrams(peptide, windows_size, pad_left=True, pad_right=True, 
+													left_pad_symbol='X', right_pad_symbol='X'))][wind:]
+	aa_neighbors = aa_neighbors[:len(aa_neighbors) - wind]
+	
+	# Extract all features for each subsequence
+	sub_seq_feature_list = []
+	for k, sub_seq in enumerate(aa_neighbors):
+	
+		# Break subsequence down to amino_acids
+		pep_sequence = list(sub_seq)
+		
+		# For each amino-acid, extract frequencies, important positions, and BLOSUM62!
+		feature_list = []
+		for j, amino_acid in enumerate(pep_sequence):
+			
+			blosum62_features = np.array(substitution_matrix[amino_acid])
+			freq_features = frequencies[(frequencies['allele'] == MHC) & (frequencies['length'] == len(peptide))]
+			position_list, append_left, append_right = extract_positions(j + k + 1 - wind, peptide, feature_size)
+			freq_features = freq_features[freq_features['position'].isin(position_list)][amino_acid].values
+			freq_features = np.hstack([blosum62_features, np.zeros(append_left), freq_features, np.zeros(append_right)])
+			feature_list.append(freq_features) 
+		
+		features = np.array(np.hstack(feature_list))
+		posn_feature = (k == 0)
+		posnplus1_feature = (k == 1)
+		posc_feature = (k == len(peptide) - 1) # Get those out!
+		features = np.hstack([features, [posn_feature], [posnplus1_feature], [posc_feature]])
+		sub_seq_feature_list.append(features)
+
+	X = np.array(np.array(sub_seq_feature_list, dtype=np.float), dtype=object)
+
+	return X
