@@ -62,6 +62,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
 - Locate all the PTM removal regex expressions and make a function instead
 - Make homology modelling into a different script in order not to ask for MODELLER keys for cases where HLA allotype has a known structure.
 - Double check on how the flexible residue code assignment works, because it may attempt to enter the `minimized_receptors` folder without a successfull CSP assignment.
@@ -129,5 +130,4 @@ This will probably happen with the new `openmmforcefields` release (when that ha
 - Ensemble of receptor conformations in RCD step (maybe after that too?)
 - Extend to Class-II using the same principle
 - AlphaFold / RosettaTFold (wait for an API like thing) (could I also generate a bunch of HLAs offline and assess instead?)
-- Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
 - Think about alternative scoring function? )and test it's RMSD to vindardo/vina/CNN)
