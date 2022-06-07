@@ -62,6 +62,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Implement different hydrogen configurations for APE-GEN, like a) Use all hydrogens (new version), b) Only polar hydrogens, c) No hydrogens (old version)
+- Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
 - Locate all the PTM removal regex expressions and make a function instead
 - Make homology modelling into a different script in order not to ask for MODELLER keys for cases where HLA allotype has a known structure.
@@ -120,9 +122,9 @@ This will probably happen with the new `openmmforcefields` release (when that ha
 
 ### Actual Experiments:
 
-- Fetch as many templates as you can and assess experiments below in terms of RMSD?
+- RMSD comparison with PANDORA paper. Focus on peptides that are difficult to model in the database, as they don't have an obvious homologue. 
 - Test RCD parameters/rigid vs. flexible/OpenMM vs. not OpenMM/#Ape-Gen cycles/any other experiment you can think of
-- Phosphorylated peptides: Check with Mauricio on modelling those
+- Performance on PTMed peptides
 
 ### Expansions:
 
