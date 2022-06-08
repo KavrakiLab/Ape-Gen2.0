@@ -14,10 +14,6 @@ from Bio import Align
 from Bio import SeqIO
 from Bio import pairwise2
 
-# PDBFIXER
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
-
 # MODELLER
 try:
 	from modeller import *
@@ -238,16 +234,6 @@ class Receptor(object):
 		file = open('./template_files/flex_res.txt', "r")
 		flexible_residues = file.readline().strip()
 		return flexible_residues
-
-	def add_sidechains(self, filestore):
-		fixer = PDBFixer(filename=self.pdb_filename)
-		fixer.findMissingResidues()
-		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-		fixer.findMissingAtoms()
-		fixer.addMissingAtoms()
-		fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
 
 	def prepare_for_scoring(self, filestore, index=""):
 
