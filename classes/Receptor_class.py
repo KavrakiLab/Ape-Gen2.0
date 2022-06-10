@@ -167,6 +167,61 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 
 class Receptor(object):
 
+	""" 
+    The Receptor class is used to represent, model, and perform modifications on an MHC receptor
+
+
+    Atributes
+    ---------
+
+    pdb_filename: 	str for the name of the PDB file representing the receptor structure
+	pdbqt_filename: str for the anme of the PDB file representing the receptor structure, including charges and atom types
+	allotype:		str for the allotype name of the MHC
+	flexible_residues: 
+	doMinimization:	boolean for whether the 
+	useSMINA = True
+
+
+    Class Methods
+    -------------
+    frompdb(str: pdb_filename, str: anchors)
+        returns a Peptide object generated from a PDB file
+
+    fromsequence(str: peptide_sequence, str: receptor_allotype, str: anchors="")
+        models and returns a Peptide object generated from a sequence, given a receptor and optional known anchors
+    
+
+    Methods
+    -------
+    TODO: add_sidechains(Peptide: self, str: filestore, int: peptide_index)
+        writes a PDB file to the filestore of the input Peptide with missing atoms added
+
+    perform_PTM(Peptide: self, str: filestore, int: peptide_index, str list: PTM_list)
+        adds PTMs to the Peptide and writes to PDB file in filestore
+        
+    prepare_for_scoring(Peptide: self, str: filestore, int: peptide_index, current_round)
+        checks validity of Peptide and runs preparation script for SMINA, changing existing PDBQT in filestore
+        
+    dock_score_with_SMINA(Peptide: self, str: filestore, Receptor: receptor, int: peptide_index)
+        runs SMINA scoring given the Peptide, Receptor, and input arguments
+        
+    score_with_SMINA(Peptide: self, str: filestore, Recpetor: receptor, int: peptide_index)
+        runs SMINA scoring given the Peptide and Receptor, storing the resulting configuration in `filestore`/minimized_receptors/        
+        
+    compute_anchor_tolerance(Peptide: self, str: filestore, Recpetor: receptor, ndarray: peptide_template_anchors_xyz, 
+                                                             float: anchor_tol, int: peptide_index, int: current_round)
+        computes the anchor tolerance, in angstroms, of the input Peptide's anchor positions from its template's anchors;
+        removes Peptide with tolerance above `anchor_tol`; copies valid Peptides to `filestore`/Anchor_filtering/
+        
+    fix_flexible_residues(Peptide: self, str: filestore, Reeptor: receptor, int: peptide_index, int: current_round)
+        modify PDF file to fix atoms of flexible residues by satifying contraints of the residues
+        
+    create_peptide_receptor_complexes(Peptide: self, str: filestore, Receptor: receptor, int: peptide_index)
+        unifies Receptor and Peptide into pMHC complex, storing the resulting PDB in `filestore`/minimized_receptors
+        
+    """
+
+
 	def __init__(self, allotype, pdb_filename):
 		self.pdb_filename = pdb_filename
 		self.pdbqt_filename = None
