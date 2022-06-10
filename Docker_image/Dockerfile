@@ -1,5 +1,5 @@
-FROM ubuntu:bionic
-ENV DEBIAN_FRONTEND=noninteractive
+    FROM ubuntu:bionic
+    ENV DEBIAN_FRONTEND=noninteractive
 
 # The following line is important for singularity
 #RUN mkdir /scratch /work /home1 /gpfs /corral-repl /corral-tacc /data
@@ -46,6 +46,7 @@ RUN conda env create -f /environment.yml
 RUN echo "source activate apegen" >> ~/.bashrc
 ENV PATH "/conda/envs/apegen/bin:$PATH"
 
+
 # This is manual, but won't work
 #RUN conda create --name apegen python=3.6 \
 #    && echo "conda activate apegen" >> ~/.bashrc \
@@ -82,7 +83,11 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 
+# replace AutoDockTools' prepare_ligand4.py with a fixed version
+RUN ["cp", "-f", "/data/helper_scripts/prepare_ligand4.py", "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"]
+
 ENTRYPOINT ["bash"]
+
 
 # Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
 # docker build . -t kavrakilab/apegen2.0
