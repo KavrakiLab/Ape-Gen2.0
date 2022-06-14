@@ -1,5 +1,5 @@
-    FROM ubuntu:bionic
-    ENV DEBIAN_FRONTEND=noninteractive
+FROM ubuntu:bionic
+ENV DEBIAN_FRONTEND=noninteractive
 
 # The following line is important for singularity
 #RUN mkdir /scratch /work /home1 /gpfs /corral-repl /corral-tacc /data
@@ -83,6 +83,7 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 
+# replace files that cause warnings and errors
 COPY /replacement_files/replace_files.sh /replace_files.sh
 RUN echo "sh /replace_files.sh" >> ~/.bashrc
 
