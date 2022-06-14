@@ -84,7 +84,10 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 
 # replace AutoDockTools' prepare_ligand4.py with a fixed version
-RUN ["cp", "-f", "/data/helper_scripts/prepare_ligand4.py", "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"]
+RUN cp -f /data/helper_scripts/prepare_ligand4.py /conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
+
+# get rid of simtk.openmm deprecation error
+RUN grep -rl 'simtk.openmm' /conda/ | xargs sed -i 's/simtk.openmm/openmm/g'
 
 ENTRYPOINT ["bash"]
 
