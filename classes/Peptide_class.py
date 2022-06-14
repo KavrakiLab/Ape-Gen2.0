@@ -10,7 +10,7 @@ import os
 import re
 import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import remove_file, extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -198,7 +198,7 @@ class Peptide(object):
 		PTMed_tidied = filestore + "/PTMed_peptides/PTMed_" + str(peptide_index) + "tidied.pdb"
 		merge_and_tidy_pdb([self.pdb_filename], PTMed_tidied)
 		copy_file(PTMed_tidied, self.pdb_filename)
-		os.remove(PTMed_tidied)
+		remove_file(PTMed_tidied)
 
 	def prepare_for_scoring(self, filestore, peptide_index, current_round):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
@@ -212,7 +212,7 @@ class Peptide(object):
 			return True
 		seq = ''.join(seq).split("\n")[1]
 		if(len(seq) != len(self.sequence)):
-			#os.remove(self.pdbqt_filename)
+			#remove_file(self.pdbqt_filename)
 			with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
@@ -288,7 +288,7 @@ class Peptide(object):
 
 		else:
 			# delete the minimized receptor coming from SMINA
-			if(receptor.doMinimization and os.path.exists(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")): os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
+			if(receptor.doMinimization and os.path.exists(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")): remove_file(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
 			
 			# Keep a log for the anchor difference
 			with open(filestore + "/Anchor_filtering/peptide_" + str(peptide_index) + ".log", 'a+') as anchor_log:
@@ -355,7 +355,7 @@ class Peptide(object):
 			#input()
 			if matching.shape[0] == 0: # Empty Solution
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
-				os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
+				remove_file(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
 				with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'a+') as flexible_log:
 					flexible_log.write(str(current_round) + "," + str(peptide_index) + ",Flexible receptor conformation received was faulty,-\n") 
 				return True
@@ -377,7 +377,7 @@ class Peptide(object):
 		merge_and_tidy_pdb([filestore + "/temp_" + str(peptide_index) + ".pdb", 
 							filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb"],
 							minimized_receptor_loc)
-		os.remove(filestore + "/temp_" + str(peptide_index) + ".pdb")
+		remove_file(filestore + "/temp_" + str(peptide_index) + ".pdb")
 
 		return False
 
