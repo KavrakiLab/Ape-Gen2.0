@@ -1,4 +1,4 @@
-from helper_scripts.Ape_gen_macros import merge_and_tidy_pdb, copy_file
+from helper_scripts.Ape_gen_macros import remove_file, merge_and_tidy_pdb, copy_file
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -6,7 +6,6 @@ import numpy as np
 
 from subprocess import call
 import sys
-import os
 import time
 import re
 
@@ -269,4 +268,4 @@ class Receptor(object):
 		# Adding the following lines to properly have TER and END fields (hence the temp file here, maybe there's a better way to do this)
 		self.pdb_filename = filestore + "/receptor_for_smina" + index + ".pdb"
 		merge_and_tidy_pdb([filestore + "/receptor_for_smina_temp" + index + ".pdb"], self.pdb_filename)
-		os.remove(filestore + "/receptor_for_smina_temp" + index + ".pdb")
+		remove_file(filestore + "/receptor_for_smina_temp" + index + ".pdb")

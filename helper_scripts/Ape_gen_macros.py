@@ -105,6 +105,9 @@ def copy_batch_of_files(src, dst, query):
 	for f in files:
 		if (query in f): shutil.copy(src + f, dst)
 
+def remove_file(filename):
+	os.remove(filename)
+
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
 	sorteded = pdb_sort.run(merged, sorting_keys='-RC') # Potentially breaking -> Not working?

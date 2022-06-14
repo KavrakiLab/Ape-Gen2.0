@@ -1,6 +1,6 @@
 import pymol2
 
-from helper_scripts.Ape_gen_macros import initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
+from helper_scripts.Ape_gen_macros import remove_file, initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -10,7 +10,6 @@ from pdbtools import pdb_splitmodel
 
 from subprocess import call
 import shutil
-import os
 
 # OPENMM
 from openmm.app import *
@@ -160,7 +159,7 @@ class pMHC(object):
 																  ), outname = "model")
 		initialize_dir(filestore + '/RCD_data/splits')	
 		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
-		os.remove(filestore + '/../../results.txt')
+		remove_file(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, reference, pep_seq, anchors):
 
