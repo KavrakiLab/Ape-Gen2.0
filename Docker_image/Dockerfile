@@ -83,14 +83,10 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 
-# replace AutoDockTools' prepare_ligand4.py with a fixed version
-RUN cp -f /data/helper_scripts/prepare_ligand4.py /conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
-
-# get rid of simtk.openmm deprecation error
-RUN grep -rl 'simtk.openmm' /conda/ | xargs sed -i 's/simtk.openmm/openmm/g'
+COPY /replacement_files/replace_files.sh /replace_files.sh
+RUN echo "sh /replace_files.sh" >> ~/.bashrc
 
 ENTRYPOINT ["bash"]
 
-
-# Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
-# docker build . -t kavrakilab/apegen2.0
+# # Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
+# # docker build . -t kavrakilab/apegen2.0
