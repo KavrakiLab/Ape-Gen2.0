@@ -165,12 +165,12 @@ def replace_HETATM(pdb_file):
 		yield line
 	fhandle.close()
 
-def delete_elements(pdb_file, element_set, chains, residues):
+def delete_elements(pdb_file, element_set, chains):
 	records = ('ATOM', 'HETATM', 'ANISOU')
 	fhandle = open(pdb_file, 'r')
 	for line in fhandle:
 		if line.startswith(records):
-			if line[13:16].strip() in element_set and line[21].strip() in chains and int(line[25]) in residues:
+			if line[13:15].strip() in element_set and line[21].strip() in chains:
 				continue
 		yield line
 	fhandle.close()
