@@ -318,17 +318,18 @@ def apegen(args):
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
 		if debug: print("Performing peptide refinement and scoring. This may take a while...")
-
-		initialize_dir(filestore + '/SMINA_data/assembled_peptides') # Need to make initialize_dirs accepting a list
-		initialize_dir(filestore + '/SMINA_data/per_peptide_results')
-		initialize_dir(filestore + '/SMINA_data/PTMed_peptides')
-		initialize_dir(filestore + '/SMINA_data/add_sidechains')
-		initialize_dir(filestore + '/SMINA_data/pdbqt_peptides') 
-		initialize_dir(filestore + '/SMINA_data/Scoring_results')
-		initialize_dir(filestore + '/SMINA_data/flexible_receptors')
-		initialize_dir(filestore + '/SMINA_data/minimized_receptors')
-		initialize_dir(filestore + '/SMINA_data/Anchor_filtering')
-		initialize_dir(filestore + '/SMINA_data/pMHC_complexes/')
+					
+		
+		initialize_dir(filestore + '/SMINA_data/assembled_peptides',	\
+						filestore + '/SMINA_data/per_peptide_results',	\
+						filestore + '/SMINA_data/PTMed_peptides',		\
+						filestore + '/SMINA_data/add_sidechains',		\
+						filestore + '/SMINA_data/pdbqt_peptides',		\
+						filestore + '/SMINA_data/Scoring_results',		\
+						filestore + '/SMINA_data/flexible_receptors',	\
+						filestore + '/SMINA_data/minimized_receptors',	\
+						filestore + '/SMINA_data/Anchor_filtering',		\
+						filestore + '/SMINA_data/pMHC_complexes/')
 
 		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
@@ -362,19 +363,19 @@ def apegen(args):
 
 			print("\n\nOpennMM optimization!\n")
 
-			initialize_dir(filestore + '/OpenMM_confs')
-			initialize_dir(filestore + '/OpenMM_confs/fixed_receptors')
-			initialize_dir(filestore + '/OpenMM_confs/minimized_complexes')
-			initialize_dir(filestore + '/OpenMM_confs/pMHC_complexes/')
-			initialize_dir(filestore + '/OpenMM_confs/pMHC_before_sim/')
-			initialize_dir(filestore + '/OpenMM_confs/connected_pMHC_complexes/')
-			initialize_dir(filestore + '/OpenMM_confs/PTM_conect_indexes/')
-			initialize_dir(filestore + '/OpenMM_confs/Scoring_results/')
-			initialize_dir(filestore + '/OpenMM_confs/per_peptide_results/')
-			initialize_dir(filestore + '/OpenMM_confs/minimized_receptors/')
-			initialize_dir(filestore + '/OpenMM_confs/Anchor_filtering')
-			initialize_dir(filestore + '/OpenMM_confs/pdbqt_peptides') 
-			initialize_dir(filestore + '/OpenMM_confs/flexible_receptors') 
+			initialize_dir(filestore + '/OpenMM_confs',								\
+							filestore + '/OpenMM_confs/fixed_receptors',			\
+							filestore + '/OpenMM_confs/minimized_complexes',		\
+							filestore + '/OpenMM_confs/pMHC_complexes/',			\
+							filestore + '/OpenMM_confs/pMHC_before_sim/',			\
+							filestore + '/OpenMM_confs/connected_pMHC_complexes/',	\
+							filestore + '/OpenMM_confs/PTM_conect_indexes/',		\
+							filestore + '/OpenMM_confs/Scoring_results/',			\
+							filestore + '/OpenMM_confs/per_peptide_results/',		\
+							filestore + '/OpenMM_confs/minimized_receptors/',		\
+							filestore + '/OpenMM_confs/Anchor_filtering',			\
+							filestore + '/OpenMM_confs/pdbqt_peptides',				\
+							filestore + '/OpenMM_confs/flexible_receptors') 
 
 			successful_confs = results_csv['Peptide index'].tolist()
 			if debug: print("Preparing input for OpenMM optimization. This may take a while...")
