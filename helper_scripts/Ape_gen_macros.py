@@ -82,12 +82,13 @@ def jaccard_distance(a, b):
 	c = a.intersection(b)
 	return float(len(c)) / (len(a) + len(b) - len(c))
 
-def initialize_dir(dirname):
-	if os.path.exists(dirname):
-		shutil.rmtree(dirname)
-	else:
-		pass
-	os.makedirs(dirname)
+def initialize_dir(*dir_names):
+	for dir_name in dir_names:
+		if os.path.exists(dir_name):
+			shutil.rmtree(dir_name)
+		else:
+			pass
+		os.makedirs(dir_name)
 
 def copy_file(src, dst):
 	shutil.copy(src, dst)
