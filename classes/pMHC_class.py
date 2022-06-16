@@ -1,6 +1,6 @@
 import pymol2
 
-from helper_scripts.Ape_gen_macros import remove_file, initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -213,8 +213,9 @@ class pMHC(object):
 			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
 			with open(conect_file, 'w') as conect_handler:
 				conect_handler.write(conected)
-
 			file_list.append(conect_file)
+			# apply_function_to_file(replace_CONECT_fields, './PTM_residue_templates/' + residue_name + '.conect')
+
 
 		self.pdb_filename = filestore + '/OpenMM_confs/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
 		merge_connect_fields(file_list, self.pdb_filename)

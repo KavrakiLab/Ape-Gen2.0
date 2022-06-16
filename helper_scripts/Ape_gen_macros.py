@@ -118,6 +118,13 @@ def merge_and_tidy_pdb(list_of_pdbs, dst):
 		pdb_file.write(''.join(reatomed))
 	pdb_file.close()
 
+def apply_function_to_file(func, filename, **kwargs):
+	overwritten = func(filename, **{key: value for key, value in kwargs.items() if key in func.__code__.co_varnames})
+	overwritten = ''.join(overwritten)
+
+	with open(filename, 'w') as altered:
+		altered.write(overwritten)
+
 def rename_chains(pdb_filename, chain_from, chain_to, dst):
 	renamed = pdb_rplchain.run(open(pdb_filename, 'r'), (chain_from, chain_to))
 	with open(dst, 'w') as file:

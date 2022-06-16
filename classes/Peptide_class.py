@@ -10,7 +10,7 @@ import os
 import re
 import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import remove_file, extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -49,7 +49,7 @@ class Peptide(object):
 		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
 
 	@classmethod
-	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv):
+	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv=''):
 
 		# Current policy of selecting/chosing peptide templates is:
 		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
@@ -181,16 +181,18 @@ class Peptide(object):
 		# For some reason, after this step, I get peptide .pdb files with:
 
 		# A. Chain A. I want to make it into chains C as before
-		rechained = replace_chains(self.pdb_filename, "A", "C")
-		overwritten = ''.join(rechained)
-		with open(self.pdb_filename, 'w') as PTMed_file:
-			PTMed_file.write(overwritten)
+		# rechained = replace_chains(self.pdb_filename, "A", "C")
+		# overwritten = ''.join(rechained)
+		# with open(self.pdb_filename, 'w') as PTMed_file:
+		# 	PTMed_file.write(overwritten)
+		apply_function_to_file(replace_chains, self.pdb_filename, chain_from="A", chain_to="C")
 
 		# B. Weird H0 pymol hydrogens that I want to delete. This is added to other residues during the PTM, so I need to remove them
-		delete_pymol_residues = delete_elements(self.pdb_filename, ["H0"], chains=["C"])
-		overwritten_2 = ''.join(delete_pymol_residues)
-		with open(self.pdb_filename, 'w') as PTMed_file:
-			PTMed_file.write(overwritten_2)
+		# delete_pymol_residues = delete_elements(self.pdb_filename, ["H0"], chains=["C"])
+		# overwritten_2 = ''.join(delete_pymol_residues)
+		# with open(self.pdb_filename, 'w') as PTMed_file:
+		# 	PTMed_file.write(overwritten_2)
+		apply_function_to_file(delete_elements, self.pdb_filename, element_set=["H0"], chains=["C"])
 
 		# C. I need to re-organize atom indexes, which are a proper mess
 		PTMed_tidied = filestore + "/PTMed_peptides/PTMed_" + str(peptide_index) + "tidied.pdb"

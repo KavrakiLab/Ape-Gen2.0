@@ -1,5 +1,5 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
+from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -23,35 +23,40 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 	new_filestore = filestore + '/OpenMM_confs'
 
 	# 1. Rename B chain to C chain
-	rechained = replace_chains(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", "B", "C")
-	overwritten = ''.join(rechained)
-	with open(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", 'w') as minimized_file:
-		minimized_file.write(overwritten)
+	# rechained = replace_chains(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", "B", "C")
+	# overwritten = ''.join(rechained)
+	# with open(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", 'w') as minimized_file:
+	# 	minimized_file.write(overwritten)
+	apply_function_to_file(replace_chains, new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", chain_from="B", chain_to="C")
 
 	# 2. Separate the peptide from the MHC
 	receptor_file, peptide_file = split_receptor_and_peptide(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb")
 
 	# 3. Prepare Receptor for Scoring
-	overwritten = remove_remarks_and_others_from_pdb(receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-	overwritten = ''.join(overwritten)
-	with open(receptor_file, 'w') as receptor_handler:
-		receptor_handler.write(overwritten)
-	receptor_handler.close()
+	# overwritten = remove_remarks_and_others_from_pdb(receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+	# overwritten = ''.join(overwritten)
+	# with open(receptor_file, 'w') as receptor_handler:
+	# 	receptor_handler.write(overwritten)
+	# receptor_handler.close()
+	apply_function_to_file(remove_remarks_and_others_from_pdb, receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+
 	receptor = Receptor.frompdb(receptor_file)
 	receptor.doMinimization = True
 	receptor.useSMINA = True
 	receptor.prepare_for_scoring(new_filestore + '/minimized_receptors', index=str(conf_index))
 
-	overwritten = remove_remarks_and_others_from_pdb(peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-	overwritten = ''.join(overwritten)
-	with open(peptide_file, 'w') as peptide_handler:
-		peptide_handler.write(overwritten)
-	peptide_handler.close()	
-	overwritten = replace_HETATM(peptide_file)
-	overwritten = ''.join(overwritten)
-	with open(peptide_file, 'w') as peptide_handler:
-		peptide_handler.write(overwritten)
-	peptide_handler.close()
+	# overwritten = remove_remarks_and_others_from_pdb(peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+	# overwritten = ''.join(overwritten)
+	# with open(peptide_file, 'w') as peptide_handler:
+	# 	peptide_handler.write(overwritten)
+	# peptide_handler.close()	
+	apply_function_to_file(remove_remarks_and_others_from_pdb, peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
+	# overwritten = replace_HETATM(peptide_file)
+	# overwritten = ''.join(overwritten)
+	# with open(peptide_file, 'w') as peptide_handler:
+	# 	peptide_handler.write(overwritten)
+	# peptide_handler.close()
+	apply_function_to_file(replace_HETATM, peptide_file)
 	
 	peptide = Peptide.frompdb(peptide_file, anchors = anchors)
 	peptide.sequence = re.sub('[a-z]', '', peptide.sequence) # Remove PTMs from the sequence
