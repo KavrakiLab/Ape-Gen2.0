@@ -10,7 +10,18 @@ import os
 import re
 import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, extract_features,   \
+											rev_anchor_dictionary, all_three_to_one_letter_codes,  \
+											move_file, copy_file, merge_and_tidy_pdb,              \
+											replace_chains, remove_remarks_and_others_from_pdb,    \
+											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
+											standard_three_to_one_letter_code, anchor_dictionary
+
+											#process_anchors, jaccard_distance
+
+											# many only use in this class (not shared):
+											#   extract_features, extract CONECT, process_anchors, distance
+											# move PTM_processing and HETAM
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -24,14 +35,16 @@ from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
 
 class Peptide(object):
 
-	def __init__(self, pdb_filename, sequence, anchors):
-		self.sequence = sequence
+	def __init__(self, pdb_filename, sequence, PTM_list, anchors):
+		self.sequence = sequence # make sequence only the AAs
+		self.PTM_list = PTM_list # have PTM list keep track of PTMs
 		self.pdb_filename = pdb_filename
 		self.pdbqt_filename = None
 		self.anchors = anchors
+		# TODO: add index attribute
 
 	@classmethod
-	def frompdb(cls, pdb_filename, anchors):
+	def frompdb(cls, pdb_filename, anchors=""):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -46,15 +59,18 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
+		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, PTM_list=[], anchors = anchors)
 
 	@classmethod
 	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv=''):
 
 		# Current policy of selecting/chosing peptide templates is:
-		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
-		sequence_length = len(re.sub('[a-z]', '', peptide_sequence_noPTM)) 
+		peptide_sequence_noPTM, peptide_PTM_list = PTM_processing(peptide_sequence)
+		sequence_length = len(peptide_sequence_noPTM)
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
+
+
+		# TODO: what exactly is cv?
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
@@ -78,6 +94,7 @@ class Peptide(object):
 
 				ranges = list(range(len(anchor_predictors[0])))
 				# Routine that does not take into account the random forests that used the datapoint as training data
+				# TODO: so the key here is allotpye-peptide_with_PTM? it's set up to consider PTMs?
 				if cv != '':
 					key = receptor_allotype + '-' + peptide_sequence
 					for i in range(len(anchor_predictors[1])):
@@ -142,8 +159,9 @@ class Peptide(object):
 		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchor_union])
 
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
-			       sequence = peptide_sequence, 
-			       anchors = peptide_anchors), template_anchors
+				   sequence = peptide_sequence_noPTM, 
+				   PTM_list = peptide_PTM_list,
+				   anchors = peptide_anchors), template_anchors
 
 	def add_sidechains(self, filestore, peptide_index):
 		fixer = PDBFixer(filename=self.pdb_filename)
@@ -181,17 +199,9 @@ class Peptide(object):
 		# For some reason, after this step, I get peptide .pdb files with:
 
 		# A. Chain A. I want to make it into chains C as before
-		# rechained = replace_chains(self.pdb_filename, "A", "C")
-		# overwritten = ''.join(rechained)
-		# with open(self.pdb_filename, 'w') as PTMed_file:
-		# 	PTMed_file.write(overwritten)
 		apply_function_to_file(replace_chains, self.pdb_filename, chain_from="A", chain_to="C")
 
 		# B. Weird H0 pymol hydrogens that I want to delete. This is added to other residues during the PTM, so I need to remove them
-		# delete_pymol_residues = delete_elements(self.pdb_filename, ["H0"], chains=["C"])
-		# overwritten_2 = ''.join(delete_pymol_residues)
-		# with open(self.pdb_filename, 'w') as PTMed_file:
-		# 	PTMed_file.write(overwritten_2)
 		apply_function_to_file(delete_elements, self.pdb_filename, element_set=["H0"], chains=["C"])
 
 		# C. I need to re-organize atom indexes, which are a proper mess
@@ -225,27 +235,27 @@ class Peptide(object):
 		self.pdb_filename =  filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb"
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
-        		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
-        		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
 	def score_with_SMINA(self, filestore, receptor, peptide_index):
@@ -340,13 +350,13 @@ class Peptide(object):
 			# CA location
 			CA_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'CA'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(CA_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-			                              rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			CA_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			# C location
 			C_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'C'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(C_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-			                              rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			#print(CA_loc, C_loc)
@@ -395,3 +405,122 @@ class Peptide(object):
 		
 		merge_and_tidy_pdb([filestore + "/minimized_receptors/receptor_" + str(peptide_index) + ".pdb", 
 							self.pdb_filename], pMHC_complex)
+
+
+def AA_error_checking(amino_acid):
+	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
+		print("The provided amino acid in the sequence is wrong")
+		sys.exit(0)
+
+def process_anchors(anchors, pep_seq):
+	# Returns the set of anchors
+	pep_length = len(re.sub('[a-z]', '', pep_seq)) # Remove any PTMs that may still exist in the sequence
+	anchor_not = set([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")])
+	return anchor_not
+
+def jaccard_distance(a, b):
+	# Computes jaccard distance between 2 sets
+	c = a.intersection(b)
+	return float(len(c)) / (len(a) + len(b) - len(c))
+
+## PTMs
+
+# Different PTMs
+
+phosphorylation_list = ['pS', 'pT', 'pY']
+acetylation_list = ['aK'] # Check details on pytms -> This is nmot working well, it renames all hydrogens to PyMOL ones
+carbamylation_list = ['cK'] # Check details on pytms
+citrullination_list = ['cR'] 
+methylation_list = ['mmK', 'mdK', 'mtK'] # Check details on pytms
+nitration_list = ['nY', 'nW'] # Check details on pytms
+s_nitrosylation_list = ['nC']
+p_hydroxylation_list = ['nP'] # Check details on pytms
+# malondialdehyde_list = ['maK'] # Check details on pytms, but probably it's too complicated to use that one
+c_oxidation_list = ['xhC', 'xoC', 'xdC'] # Check details on pytms
+m_oxidation_list = ['oM'] # Check details on pytms
+
+
+def PTM_processing(sequence):
+	sequence_list = re.sub( r"([A-Z])", r"\1 ", sequence).split() # Split pep sequence while retaining the PTM
+		
+	PTM_list = []
+	sequence_noPTM = ""
+	for i, amino_acid in enumerate(sequence_list):
+		if len(amino_acid) > 1:
+			prefix = PTM_error_checking(amino_acid)
+			AA_error_checking(amino_acid[1])
+			PTM_list.append(prefix + str(i + 1))
+		else:
+			AA_error_checking(amino_acid)
+		sequence_noPTM += amino_acid[-1]
+	return sequence_noPTM, PTM_list
+
+def PTM_error_checking(amino_acid):
+	prefix = amino_acid[0]
+	if prefix == 'p':
+		if amino_acid in phosphorylation_list:
+			return "phosphorylate "
+		else:
+			print("The only amino acids that support phosphorylation are S, T and Y")
+			sys.exit(0)
+	elif prefix == 'n':
+		if amino_acid in s_nitrosylation_list: # Keep in mind that we will need an elif here for the rest of n's
+			return "nitrosylate "
+		elif amino_acid in p_hydroxylation_list:
+			return "proline-hydroxylate "
+		elif amino_acid in nitration_list:
+			return "nitrate "
+		else:
+			print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
+			sys.exit(0)
+	elif prefix == 'c':
+		if amino_acid in citrullination_list: # Keep in mind that we will need an elif here for the rest of c's
+			return "citrullinate "
+		elif amino_acid in carbamylation_list:
+			return "carbamylate "
+		else:
+			print("The PTMs that have the c as prefix are carbamylation and citrullination (maybe c_oxidation also). For these PTMs, the only supported amino acids are C, K and R")
+			sys.exit(0)
+	elif prefix == 'a':
+		if amino_acid in acetylation_list:
+			return "acetylate "
+		else:
+			print("The PTM that has the a as prefix is acetylation. For these PTM, the only supported amino acid is K.")
+			sys.exit(0)
+	elif prefix == 'm':
+		if amino_acid in methylation_list:
+			if amino_acid[1] == 'm':
+				return "methylate "
+			elif amino_acid[1] == 'd':
+				return "di-methylate "
+			elif amino_acid[1] == 't':
+				return "tri-methylate "
+			else:
+				print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+				sys.exit(0)
+		else:
+			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			sys.exit(0)
+	elif prefix == 'x':
+		if amino_acid in c_oxidation_list:
+			if amino_acid[1] == 'h':
+				return "cysteine-hydroxydate "
+			elif amino_acid[1] == 'o':
+				return "cysteine-oxydate "
+			elif amino_acid[1] == 'd':
+				return "cysteine-dioxydate "
+			else:
+				print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
+				sys.exit(0)
+		else:
+			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			sys.exit(0)
+	elif prefix == 'o':
+		if amino_acid in m_oxidation_list:
+			return "methionine-oxidization "
+		else:
+			print("PTM chosen is methionine oxidization. For these PTM, the only supported amino acid is M.")
+			sys.exit(0)
+	else:
+		print("Wrong PTM prefix, check PTM notation")
+		sys.exit(0)

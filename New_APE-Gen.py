@@ -1,5 +1,11 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
+from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains, initialize_dir,  \
+											merge_and_tidy_pdb,  		   \
+											create_csv_from_list_of_files, 						   \
+											copy_file, pretty_print_analytics, move_batch_of_files,\
+											copy_batch_of_files, split_receptor_and_peptide,	   \
+											remove_remarks_and_others_from_pdb, replace_HETATM,    \
+											delete_elements
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -23,21 +29,12 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 	new_filestore = filestore + '/OpenMM_confs'
 
 	# 1. Rename B chain to C chain
-	# rechained = replace_chains(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", "B", "C")
-	# overwritten = ''.join(rechained)
-	# with open(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", 'w') as minimized_file:
-	# 	minimized_file.write(overwritten)
 	apply_function_to_file(replace_chains, new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb", chain_from="B", chain_to="C")
 
 	# 2. Separate the peptide from the MHC
 	receptor_file, peptide_file = split_receptor_and_peptide(new_filestore + "/minimized_complexes/pMHC_" + str(conf_index) + ".pdb")
 
 	# 3. Prepare Receptor for Scoring
-	# overwritten = remove_remarks_and_others_from_pdb(receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-	# overwritten = ''.join(overwritten)
-	# with open(receptor_file, 'w') as receptor_handler:
-	# 	receptor_handler.write(overwritten)
-	# receptor_handler.close()
 	apply_function_to_file(remove_remarks_and_others_from_pdb, receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
 
 	receptor = Receptor.frompdb(receptor_file)
@@ -45,17 +42,8 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 	receptor.useSMINA = True
 	receptor.prepare_for_scoring(new_filestore + '/minimized_receptors', index=str(conf_index))
 
-	# overwritten = remove_remarks_and_others_from_pdb(peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-	# overwritten = ''.join(overwritten)
-	# with open(peptide_file, 'w') as peptide_handler:
-	# 	peptide_handler.write(overwritten)
-	# peptide_handler.close()	
 	apply_function_to_file(remove_remarks_and_others_from_pdb, peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-	# overwritten = replace_HETATM(peptide_file)
-	# overwritten = ''.join(overwritten)
-	# with open(peptide_file, 'w') as peptide_handler:
-	# 	peptide_handler.write(overwritten)
-	# peptide_handler.close()
+
 	apply_function_to_file(replace_HETATM, peptide_file)
 	
 	peptide = Peptide.frompdb(peptide_file, anchors = anchors)
@@ -138,6 +126,7 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
 	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, peptide_index, current_round)
 	if(peptide_is_not_valid): return
+	# TODO: access and define a new receptor, then do CSP on that receptor
 
 	# 4b. Optimize and score with SMINA (or other options, depending on args)
 	peptide.dock_score_with_SMINA(new_filestore, receptor, peptide_index) 
@@ -243,39 +232,42 @@ def apegen(args):
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
 
-	# Receptor Template is a pMHC complex
-	receptor_template = pMHC(pdb_filename = receptor_template_file, receptor = receptor) 
-	if debug:
-		print("Receptor Successfully Processed")
-		print("Receptor Allotype: " + receptor.allotype)
-		print("Receptor Template: " + receptor_template.pdb_filename)
-
+	
     # 1b. Peptide
 	if debug: print("Processing Peptide Input")
 	if peptide_input.endswith(".pdb"):
 		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
 		# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
+		# TODO: should anchors be set from arguments?
+		#	fromPDB is only for redocking?
+		#	is there never an instance where the input will only be chain C? 
 		peptide = Peptide.frompdb(peptide_input, anchors = "") 
 	else:
 		# Fetch template from peptide template list
 		# peptide = Peptide.fromsequence(peptide_input)
 		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
 
-	# Peptide Template is also a pMHC complex though	
-	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
-
+	# Peptide Template and Receptor Template are pMHC complexes	
+	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide)
+	receptor_template = pMHC(pdb_filename = receptor_template_file, peptide=peptide, receptor = receptor)
+	# Receptor Template is a pMHC complex
+	 
+	
+	
 	# Get peptide template anchor positions for anchor tolerance filtering
 	if debug: print("Extract peptide template anchors for anchor tolerance filtering")
-	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template, 
-																   pep_seq = peptide.sequence,
+	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template,
 																   anchors = template_anchors)
 
 	# The reason that we calculate the PTMs list here and not in the Peptide class is because we need it to be a
 	# global variable to pass it on all peptide instances that need to be PTMed
-	PTM_list = sequence_PTM_processing(peptide.sequence)
-	peptide.sequence = re.sub('[a-z]', '', peptide.sequence)
+	PTM_list = peptide.PTM_list
+	# peptide.sequence = re.sub('[a-z]', '', peptide.sequence)
 
-	if debug: 
+	if debug:
+		print("Receptor Successfully Processed")
+		print("Receptor Allotype: " + receptor.allotype)
+		print("Receptor Template: " + receptor_template.pdb_filename)
 		print("Peptide Successfully Processed")
 		print("Peptide Sequence: " + peptide.sequence)
 		print("Peptide Template: " + peptide_template.pdb_filename)
@@ -307,12 +299,12 @@ def apegen(args):
 		if debug: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference = peptide_template, filestore = filestore)
 		if debug: print("Preparing input to RCD")
-		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore, pep_seq = peptide.sequence)
+		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore)
 		receptor_template.add_sidechains(filestore = filestore)
 
 		# Perform RCD on the receptor given peptide:
 		if debug: print("Performing RCD")
-		receptor_template.RCD(peptide, RCD_dist_tol, num_loops, filestore)
+		receptor_template.RCD(RCD_dist_tol, num_loops, filestore)
 
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")

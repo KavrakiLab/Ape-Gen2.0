@@ -1,6 +1,9 @@
 import pymol2
 
-from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir,	   \
+											move_batch_of_files, merge_and_tidy_pdb,			   \
+											all_one_to_three_letter_codes, replace_CONECT_fields,  \
+											merge_connect_fields
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -25,7 +28,7 @@ class pMHC(object):
 
 	def __init__(self, pdb_filename, peptide = None, receptor = None):
 		self.pdb_filename = pdb_filename
-		self.peptide = peptide
+		self.peptide = peptide # doesn't need PTMs
 		self.receptor = receptor
 		self.anchor_xyz = None
 
@@ -63,7 +66,7 @@ class pMHC(object):
 		fixer.addMissingAtoms()
 		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'), keepIds=True)
 
-	def prepare_for_RCD(self, reference, filestore, pep_seq):
+	def prepare_for_RCD(self, reference, filestore):
 
 		# Function that prepares files for performing RCD
 		# Namely, it extracts the peptide anchors from the peptime template
@@ -99,6 +102,7 @@ class pMHC(object):
 		# Here, I am replacing the (anchor) residues of the template peptide with the residues of the given peptide.
 		# Note to self: I don't think I need to replace for the other residues, as this is something RCD takes care of
 		template_peptide_len = pdb_df_peptide['residue_number'].max()
+		pep_seq = self.peptide.sequence
 		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[0]]
 		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 2, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[1]]
 		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len - 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[len(pep_seq) - 2]]
@@ -138,14 +142,14 @@ class pMHC(object):
 
 		# DONE!
 
-	def RCD(self, peptide, RCD_dist_tol, num_loops, filestore):
+	def RCD(self, RCD_dist_tol, num_loops, filestore):
 
 		initialize_dir(filestore + '/RCD_data')
 
 		# Create loops.txt file
-		last_non_anchor = len(peptide.sequence) - 2
+		last_non_anchor = len(self.peptide.sequence) - 2
 		with open(filestore + "/input_to_RCD/loops.txt", 'w') as loops:
-			loops.write(filestore + "/input_to_RCD/anchored_pMHC.pdb 3 " + str(last_non_anchor) + " C " + peptide.sequence[2:last_non_anchor])
+			loops.write(filestore + "/input_to_RCD/anchored_pMHC.pdb 3 " + str(last_non_anchor) + " C " + self.peptide.sequence[2:last_non_anchor])
 		loops.close()
 
 		# Perform RCD:
@@ -161,7 +165,7 @@ class pMHC(object):
 		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
 		remove_file(filestore + '/../../results.txt')
 
-	def set_anchor_xyz(self, reference, pep_seq, anchors):
+	def set_anchor_xyz(self, reference, anchors):
 
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(reference.pdb_filename)
@@ -207,14 +211,13 @@ class pMHC(object):
 				next_N = pdb_df_complex[(pdb_df_complex['residue_number'] == PTM_index + 1) & (pdb_df_complex['atom_name'] == 'N')]['atom_number'].item()
 				external_bonds_list.append((current_C, next_N))
 
-			conect = replace_CONECT_fields('./PTM_residue_templates/' + residue_name + '.conect',
-										   sub_pdb, external_bonds_list)
-			conected = ''.join(conect)
-			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
-			with open(conect_file, 'w') as conect_handler:
-				conect_handler.write(conected)
+			conect_file = apply_function_to_file(func=replace_CONECT_fields, 
+												 input_filename='./PTM_residue_templates/' + residue_name + '.conect', 
+												 output_filename=filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + 
+												 					str(peptide_index)  + residue_name + str(PTM_index) + '.pdb', 
+												 index_df=sub_pdb,
+												 external_bonds_list=external_bonds_list)
 			file_list.append(conect_file)
-			# apply_function_to_file(replace_CONECT_fields, './PTM_residue_templates/' + residue_name + '.conect')
 
 
 		self.pdb_filename = filestore + '/OpenMM_confs/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
