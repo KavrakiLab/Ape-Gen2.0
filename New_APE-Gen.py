@@ -155,45 +155,6 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 # init both, then call class methods
 
 
-def init_receptor(receptor_class, file_storage, peptide_input):
-	if verbose(): print("Processing Receptor Input")
-
-	initialize_dir(file_storage)
-
-	if receptor_class.endswith(".pdb"):
-		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
-		receptor = Receptor.frompdb(receptor_class)
-		receptor_template_file = receptor_class
-	elif receptor_class.endswith(".fasta"):
-		# If this is a sequence, the template is taken by MODELLER
-		receptor = Receptor.fromfasta(receptor_class, peptide_input, file_storage)
-		receptor_template_file = receptor.pdb_filename
-	elif receptor_class == "REDOCK":
-		# If REDOCK, the receptor template is the peptide template!
-		receptor = Receptor.fromredock(peptide_input)
-		receptor_template_file = peptide.pdb_filename
-	else:
-		# If this is an allotype specification, fetch template like the peptide!
-		receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage)
-		receptor_template_file = receptor.pdb_filename
-	return receptor, receptor_template_file
-
-def init_peptide(peptide_input, receptor, anchors):
-	if verbose(): print("Processing Peptide Input")
-	if peptide_input.endswith(".pdb"):
-		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
-		# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
-		# TODO: should anchors be set from arguments?
-		#	fromPDB is only for redocking?
-		#	is there never an instance where the input will only be chain C? 
-		peptide = Peptide.frompdb(peptide_input, anchors="")
-		template_anchors = None
-	else:
-		# Fetch template from peptide template list
-		# peptide = Peptide.fromsequence(peptide_input)
-		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
-	return peptide, template_anchors
-
 
 def apegen(args):
 	print("Start of APE-Gen")
@@ -260,27 +221,22 @@ def apegen(args):
 	initialize_dir(temp_files_storage)
 
     # 1. INPUT PROCESSING
+	peptide = Peptide.init_peptide(peptide_input)
+	PTM_list = peptide.PTM_list
 
-	receptor, receptor_template_file = init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide_input)
+	receptor, receptor_template_file = Receptor.init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide.sequence)
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
-
-	peptide, template_anchors = init_peptide(peptide_input, receptor, anchors)
-
+	
 	# Peptide Template and Receptor Template are pMHC complexes	
+	template_anchors = peptide.get_template_anchors(receptor.allotype, anchors)
 	peptide_template = pMHC(pdb_filename=peptide.pdb_filename, peptide=peptide)
 	receptor_template = pMHC(pdb_filename=receptor_template_file, peptide=peptide, receptor=receptor)
-	
-	
+
 	# Get peptide template anchor positions for anchor tolerance filtering
 	if verbose: print("Extract peptide template anchors for anchor tolerance filtering")
 	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template,
 																   anchors = template_anchors)
-
-	# The reason that we calculate the PTMs list here and not in the Peptide class is because we need it to be a
-	# global variable to pass it on all peptide instances that need to be PTMed
-	PTM_list = peptide.PTM_list
-	# peptide.sequence = re.sub('[a-z]', '', peptide.sequence)
 
 	if verbose:
 		print("Receptor Successfully Processed")

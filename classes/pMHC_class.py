@@ -168,6 +168,7 @@ class pMHC(object):
 	def set_anchor_xyz(self, reference, anchors):
 
 		ppdb_peptide = PandasPdb()
+
 		ppdb_peptide.read_pdb(reference.pdb_filename)
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 

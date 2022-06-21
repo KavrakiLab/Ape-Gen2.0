@@ -1,4 +1,4 @@
-from helper_scripts.Ape_gen_macros import remove_file, merge_and_tidy_pdb, copy_file, verbose
+from helper_scripts.Ape_gen_macros import remove_file, merge_and_tidy_pdb, copy_file, initialize_dir, verbose
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -174,6 +174,31 @@ class Receptor(object):
 		self.doMinimization = True
 		self.useSMINA = True
 
+	def init_receptor(receptor_class, file_storage, peptide_input):
+		if verbose(): print("Processing Receptor Input")
+
+		initialize_dir(file_storage)
+
+		if receptor_class.endswith(".pdb"):
+			# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
+			receptor = Receptor.frompdb(receptor_class)
+			receptor_template_file = receptor_class
+		elif receptor_class.endswith(".fasta"):
+			# If this is a sequence, the template is taken by MODELLER
+			receptor = Receptor.fromfasta(receptor_class, peptide_input, file_storage)
+			receptor_template_file = receptor.pdb_filename
+		elif receptor_class == "REDOCK":
+			# If REDOCK, the receptor template is the peptide template!
+			receptor = Receptor.fromredock(peptide_input)
+			receptor_template_file = peptide.pdb_filename
+		else:
+			# If this is an allotype specification, fetch template like the peptide!
+			receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage)
+			receptor_template_file = receptor.pdb_filename
+		return receptor, receptor_template_file
+
+
+
 	@classmethod
 	def frompdb(cls, pdb_filename): # Checking if .pdb file is ok maybe?
 		return cls(allotype = "In PDB", pdb_filename = pdb_filename)
@@ -186,7 +211,7 @@ class Receptor(object):
 	def fromallotype(cls, allotype, peptide_sequence, filestore):
 
 		# Pre-process: Remove any PTMs from the peptide sequence:
-		peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
+		# peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")

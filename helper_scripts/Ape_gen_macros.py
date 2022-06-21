@@ -75,22 +75,6 @@ rev_anchor_dictionary = {'N_+0' : {'8': 1, '9': 1, '10': 1, '11': 1, '12': 1, '1
 
 ## FUNCTIONS
 
-# def AA_error_checking(amino_acid):
-# 	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
-# 		print("The provided amino acid in the sequence is wrong")
-# 		sys.exit(0)
-
-# def process_anchors(anchors, pep_seq):
-# 	# Returns the set of anchors
-# 	pep_length = len(re.sub('[a-z]', '', pep_seq)) # Remove any PTMs that may still exist in the sequence
-# 	anchor_not = set([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")])
-# 	return anchor_not
-
-# def jaccard_distance(a, b):
-# 	# Computes jaccard distance between 2 sets
-# 	c = a.intersection(b)
-# 	return float(len(c)) / (len(a) + len(b) - len(c))
-
 def initialize_dir(*dir_names):
 	for dir_name in dir_names:
 		if os.path.exists(dir_name):
