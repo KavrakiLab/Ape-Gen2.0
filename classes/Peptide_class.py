@@ -15,7 +15,8 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, e
 											move_file, copy_file, merge_and_tidy_pdb,              \
 											replace_chains, remove_remarks_and_others_from_pdb,    \
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
-											standard_three_to_one_letter_code, anchor_dictionary
+											standard_three_to_one_letter_code, anchor_dictionary,  \
+											verbose
 
 											#process_anchors, jaccard_distance
 
@@ -53,12 +54,12 @@ class Peptide(object):
 		peptide_3letter_list = pdb_df['residue_name'].tolist()
 
 		if len(peptide_3letter_list) == 0:
-			print("Chain C does not exist in given .pdb file, check your format")
+			if verbose(): print("Chain C does not exist in given .pdb file, check your format")
 			
 		try:
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
-			print("There is something wrong with your .pdb 3-letter amino acid notation")
+			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
 		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, PTM_list=[], anchors = anchors)
 
 	@classmethod
@@ -73,13 +74,14 @@ class Peptide(object):
 		# TODO: what exactly is cv?
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
+		# removes pdb code of peptide in order to cross validate (just for testing)
 
 		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
 		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
 		# (maybe play with user input for now?)
 		if anchors == "":
 			
-			print("Determining anchors for given peptide sequence and allele allotype")
+			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
 			# Load the MHCflurry frequencies
 			frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
 
@@ -88,7 +90,7 @@ class Peptide(object):
 			frequencies_alleles = pd.unique(frequencies['allele'])
 
 			if receptor_allotype in frequencies_alleles:
-				print("Receptor allotype has a known MHC binding motif!")
+				if verbose(): print("Receptor allotype has a known MHC binding motif!")
 				peptide_features = extract_features(peptide_sequence_noPTM, receptor_allotype, frequencies)
 				anchor_predictors = pkl.load(open("./helper_files/anchor_predictors.pkl", "rb"))
 
@@ -107,10 +109,10 @@ class Peptide(object):
 				anchors = list(np.argwhere(predictions >= 0.5).flatten() + 1)
 				anchors = ",".join(map(str, anchors))
 			else:
-				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
+				if verbose(): print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
 				anchors = "2,9"
 
-		print("Predicted anchors for the peptide: ", anchors)
+		if verbose(): print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, peptide_sequence_noPTM)
 		templates['anchor_not'] = templates['anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
@@ -156,6 +158,7 @@ class Peptide(object):
 		# C) Extract the numbers using the peptide lengths
 		anchor_union = list(anchors_not.intersection(template_anchors_not))
 		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in anchor_union])
+		if verbose(): print(template_anchors)
 		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchor_union])
 
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
@@ -304,7 +307,7 @@ class Peptide(object):
 			with open(filestore + "/Anchor_filtering/peptide_" + str(peptide_index) + ".log", 'a+') as anchor_log:
 				anchor_log.write(str(current_round) + "," + str(peptide_index) + "," + ','.join(map(str, anchor_difference))) 
 			
-			# Keep this result for final printing
+			# Keep this result for final if verbose(): printing
 			faulty_positions = (anchor_difference > anchor_tol)*self.anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
 			with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
@@ -359,9 +362,9 @@ class Peptide(object):
 										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
-			#print(CA_loc, C_loc)
+			#if verbose(): print(CA_loc, C_loc)
 			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
-			#print(matching)
+			#if verbose(): print(matching)
 			#input()
 			if matching.shape[0] == 0: # Empty Solution
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
@@ -409,7 +412,7 @@ class Peptide(object):
 
 def AA_error_checking(amino_acid):
 	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
-		print("The provided amino acid in the sequence is wrong")
+		if verbose(): print("The provided amino acid in the sequence is wrong")
 		sys.exit(0)
 
 def process_anchors(anchors, pep_seq):
@@ -461,7 +464,7 @@ def PTM_error_checking(amino_acid):
 		if amino_acid in phosphorylation_list:
 			return "phosphorylate "
 		else:
-			print("The only amino acids that support phosphorylation are S, T and Y")
+			if verbose(): print("The only amino acids that support phosphorylation are S, T and Y")
 			sys.exit(0)
 	elif prefix == 'n':
 		if amino_acid in s_nitrosylation_list: # Keep in mind that we will need an elif here for the rest of n's
@@ -471,7 +474,7 @@ def PTM_error_checking(amino_acid):
 		elif amino_acid in nitration_list:
 			return "nitrate "
 		else:
-			print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
+			if verbose(): print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
 			sys.exit(0)
 	elif prefix == 'c':
 		if amino_acid in citrullination_list: # Keep in mind that we will need an elif here for the rest of c's
@@ -479,13 +482,13 @@ def PTM_error_checking(amino_acid):
 		elif amino_acid in carbamylation_list:
 			return "carbamylate "
 		else:
-			print("The PTMs that have the c as prefix are carbamylation and citrullination (maybe c_oxidation also). For these PTMs, the only supported amino acids are C, K and R")
+			if verbose(): print("The PTMs that have the c as prefix are carbamylation and citrullination (maybe c_oxidation also). For these PTMs, the only supported amino acids are C, K and R")
 			sys.exit(0)
 	elif prefix == 'a':
 		if amino_acid in acetylation_list:
 			return "acetylate "
 		else:
-			print("The PTM that has the a as prefix is acetylation. For these PTM, the only supported amino acid is K.")
+			if verbose(): print("The PTM that has the a as prefix is acetylation. For these PTM, the only supported amino acid is K.")
 			sys.exit(0)
 	elif prefix == 'm':
 		if amino_acid in methylation_list:
@@ -496,10 +499,10 @@ def PTM_error_checking(amino_acid):
 			elif amino_acid[1] == 't':
 				return "tri-methylate "
 			else:
-				print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+				if verbose(): print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
 				sys.exit(0)
 		else:
-			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			if verbose(): print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
 			sys.exit(0)
 	elif prefix == 'x':
 		if amino_acid in c_oxidation_list:
@@ -510,17 +513,17 @@ def PTM_error_checking(amino_acid):
 			elif amino_acid[1] == 'd':
 				return "cysteine-dioxydate "
 			else:
-				print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
+				if verbose(): print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
 				sys.exit(0)
 		else:
-			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			if verbose(): print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
 			sys.exit(0)
 	elif prefix == 'o':
 		if amino_acid in m_oxidation_list:
 			return "methionine-oxidization "
 		else:
-			print("PTM chosen is methionine oxidization. For these PTM, the only supported amino acid is M.")
+			if verbose(): print("PTM chosen is methionine oxidization. For these PTM, the only supported amino acid is M.")
 			sys.exit(0)
 	else:
-		print("Wrong PTM prefix, check PTM notation")
+		if verbose(): print("Wrong PTM prefix, check PTM notation")
 		sys.exit(0)

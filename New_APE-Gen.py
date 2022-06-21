@@ -5,7 +5,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains
 											copy_file, pretty_print_analytics, move_batch_of_files,\
 											copy_batch_of_files, split_receptor_and_peptide,	   \
 											remove_remarks_and_others_from_pdb, replace_HETATM,    \
-											delete_elements
+											delete_elements, verbose, set_verbose
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -146,7 +146,57 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	# Done!
 	return
 
+
+# TODO: move to Peptide and Receptor files
+
+# suggestion:
+# set pMHC as parent class, have Pep and Rec inherit
+
+# init both, then call class methods
+
+
+def init_receptor(receptor_class, file_storage, peptide_input):
+	if verbose(): print("Processing Receptor Input")
+
+	initialize_dir(file_storage)
+
+	if receptor_class.endswith(".pdb"):
+		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
+		receptor = Receptor.frompdb(receptor_class)
+		receptor_template_file = receptor_class
+	elif receptor_class.endswith(".fasta"):
+		# If this is a sequence, the template is taken by MODELLER
+		receptor = Receptor.fromfasta(receptor_class, peptide_input, file_storage)
+		receptor_template_file = receptor.pdb_filename
+	elif receptor_class == "REDOCK":
+		# If REDOCK, the receptor template is the peptide template!
+		receptor = Receptor.fromredock(peptide_input)
+		receptor_template_file = peptide.pdb_filename
+	else:
+		# If this is an allotype specification, fetch template like the peptide!
+		receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage)
+		receptor_template_file = receptor.pdb_filename
+	return receptor, receptor_template_file
+
+def init_peptide(peptide_input, receptor, anchors):
+	if verbose(): print("Processing Peptide Input")
+	if peptide_input.endswith(".pdb"):
+		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
+		# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
+		# TODO: should anchors be set from arguments?
+		#	fromPDB is only for redocking?
+		#	is there never an instance where the input will only be chain C? 
+		peptide = Peptide.frompdb(peptide_input, anchors="")
+		template_anchors = None
+	else:
+		# Fetch template from peptide template list
+		# peptide = Peptide.fromsequence(peptide_input)
+		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
+	return peptide, template_anchors
+
+
 def apegen(args):
+	print("Start of APE-Gen")
 
 	# 0. ARGUMENTS:
 	
@@ -171,8 +221,9 @@ def apegen(args):
 	# - rigid_receptor : Disable sampling of receptor DoFs in the flex_res.txt
 	doReceptorMinimization = not args.rigid_receptor
 
-	# - Debug: Print extra information?
-	debug = args.debug
+	# - Verbose: Print extra information
+	verbose = args.verbose
+	set_verbose(verbose)
 
 	# --Save_only_pep_confs: Disable saving full conformations (peptide and MHC)
 	saveFullConfs = not args.save_only_pep_confs
@@ -210,52 +261,19 @@ def apegen(args):
 
     # 1. INPUT PROCESSING
 
-    # 1a. Receptor
-	if debug: print("Processing Receptor Input")
-	initialize_dir(temp_files_storage +  '/MODELLER_output')
-	if receptor_class.endswith(".pdb"):
-		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
-		receptor = Receptor.frompdb(receptor_class)
-		receptor_template_file = receptor_class
-	elif receptor_class.endswith(".fasta"):
-		# If this is a sequence, the template is taken by MODELLER
-		receptor = Receptor.fromfasta(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output')
-		receptor_template_file = receptor.pdb_filename
-	elif receptor_class == "REDOCK":
-		# If REDOCK, the receptor template is the peptide template!
-		receptor = Receptor.fromredock(peptide_input)
-		receptor_template_file = peptide.pdb_filename
-	else:
-		# If this is an allotype specification, fetch template like the peptide!
-		receptor = Receptor.fromallotype(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output')
-		receptor_template_file = receptor.pdb_filename
+	receptor, receptor_template_file = init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide_input)
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
 
-	
-    # 1b. Peptide
-	if debug: print("Processing Peptide Input")
-	if peptide_input.endswith(".pdb"):
-		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
-		# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
-		# TODO: should anchors be set from arguments?
-		#	fromPDB is only for redocking?
-		#	is there never an instance where the input will only be chain C? 
-		peptide = Peptide.frompdb(peptide_input, anchors = "") 
-	else:
-		# Fetch template from peptide template list
-		# peptide = Peptide.fromsequence(peptide_input)
-		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
+	peptide, template_anchors = init_peptide(peptide_input, receptor, anchors)
 
 	# Peptide Template and Receptor Template are pMHC complexes	
-	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide)
-	receptor_template = pMHC(pdb_filename = receptor_template_file, peptide=peptide, receptor = receptor)
-	# Receptor Template is a pMHC complex
-	 
+	peptide_template = pMHC(pdb_filename=peptide.pdb_filename, peptide=peptide)
+	receptor_template = pMHC(pdb_filename=receptor_template_file, peptide=peptide, receptor=receptor)
 	
 	
 	# Get peptide template anchor positions for anchor tolerance filtering
-	if debug: print("Extract peptide template anchors for anchor tolerance filtering")
+	if verbose: print("Extract peptide template anchors for anchor tolerance filtering")
 	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template,
 																   anchors = template_anchors)
 
@@ -264,7 +282,7 @@ def apegen(args):
 	PTM_list = peptide.PTM_list
 	# peptide.sequence = re.sub('[a-z]', '', peptide.sequence)
 
-	if debug:
+	if verbose:
 		print("Receptor Successfully Processed")
 		print("Receptor Allotype: " + receptor.allotype)
 		print("Receptor Template: " + receptor_template.pdb_filename)
@@ -290,31 +308,31 @@ def apegen(args):
 	while current_round < num_rounds + 1: 
 
 		# File storage location for the current round
-		print("\n\nStarting round " + str(current_round) + " !!!!\n")
+		if verbose: print("\n\nStarting round " + str(current_round) + " !!!!\n")
 		filestore = temp_files_storage + "/" + str(current_round)
 
 		# Alignment and preparing input for RCD
 		# WARNING: pMHC complex at the time has both pMHC structures. 
 		# It will be after the alignment that peptide file is a peptide and receptor file is a receptor
-		if debug: print("Aligning peptide anchors to MHC pockets")
+		if verbose: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference = peptide_template, filestore = filestore)
-		if debug: print("Preparing input to RCD")
+		if verbose: print("Preparing input to RCD")
 		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore)
 		receptor_template.add_sidechains(filestore = filestore)
 
 		# Perform RCD on the receptor given peptide:
-		if debug: print("Performing RCD")
+		if verbose: print("Performing RCD")
 		receptor_template.RCD(RCD_dist_tol, num_loops, filestore)
 
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
-		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
+		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/SMINA_data')
 		receptor = receptor_template.receptor
 		receptor.add_sidechains(filestore)
 		receptor.prepare_for_scoring(filestore + "/SMINA_data")
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
-		if debug: print("Performing peptide refinement and scoring. This may take a while...")
+		if verbose: print("Performing peptide refinement and scoring. This may take a while...")
 					
 		
 		initialize_dir(filestore + '/SMINA_data/assembled_peptides',	\
@@ -331,7 +349,7 @@ def apegen(args):
 		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
 		with WorkerPool(n_jobs=num_cores) as pool:
-			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
+			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
 
 		initialize_dir(filestore + '/Final_conformations/')
 
@@ -350,15 +368,15 @@ def apegen(args):
 
 		# Print and keep statistics
 		best_conf_dir = filestore + '/SMINA_data'
-		print("\n\nEnd of main workflow of round no. " + str(current_round) + "!!!")
+		if verbose: print("\n\nEnd of main workflow of round no. " + str(current_round) + "!!!")
 		create_csv_from_list_of_files(filestore + '/SMINA_data/total_results.csv', glob.glob(filestore + '/SMINA_data/per_peptide_results/*.log'))
-		results_csv = pretty_print_analytics(filestore + '/SMINA_data/total_results.csv')
+		results_csv = pretty_print_analytics(filestore + '/SMINA_data/total_results.csv', verbose=verbose)
 		results_csv.to_csv(filestore + '/SMINA_data/successful_conformations_statistics.csv', index = False)
 
 		# OpenMM step
 		if(score_with_openmm and results_csv.shape[0] > 0):
 
-			print("\n\nOpennMM optimization!\n")
+			if verbose: print("\n\nOpennMM optimization!\n")
 
 			initialize_dir(filestore + '/OpenMM_confs',								\
 							filestore + '/OpenMM_confs/fixed_receptors',			\
@@ -375,39 +393,47 @@ def apegen(args):
 							filestore + '/OpenMM_confs/flexible_receptors') 
 
 			successful_confs = results_csv['Peptide index'].tolist()
-			if debug: print("Preparing input for OpenMM optimization. This may take a while...")
+			if verbose: print("Preparing input for OpenMM optimization. This may take a while...")
 
 			# First prepare for OpenMM
 			arg_list = list(map(lambda e: (e, filestore, peptide, PTM_list), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
-				results = pool.map(prepare_for_openmm, arg_list, progress_bar=True)
+				results = pool.map(prepare_for_openmm, arg_list, progress_bar=verbose)
 
 			# Actual minimization step
-			if debug: print("\nMinimizing energy...")
-			for conf_index in tqdm(successful_confs, desc="pMHC conf", position = 0):
+			
+			if verbose:
+				print("\nMinimizing energy...")
+				disable_progress_bar = False
+				leave_progress_bar=False
+			else:
+				disable_progress_bar = True
+				leave_progress_bar=True
+
+			for conf_index in tqdm(successful_confs, desc="pMHC conf", position=0, disable=disable_progress_bar):
 
 				numTries = 1
 				best_energy = float("inf")
 				pMHC_complex = pMHC(pdb_filename = filestore + "/OpenMM_confs/connected_pMHC_complexes/pMHC_" + str(conf_index) + ".pdb", 
 									peptide = peptide)
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
-												leave=False):
+												leave=leave_progress_bar, disable=disable_progress_bar):
 					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
 
 			# Rescoring and re-filtering resulting conformations
-			if debug: print("\nRescoring and re-filtering resulting conformations:")
+			if verbose: print("\nRescoring and re-filtering resulting conformations:")
 			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, peptide.anchors), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
-				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=True)
+				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=verbose)
 
 			copy_batch_of_files(filestore + '/OpenMM_confs/pMHC_complexes/', 
 								filestore + '/Final_conformations/',
 								query="pMHC_")
 
 			best_conf_dir = filestore + '/OpenMM_confs'
-			print("\n\nEnd of OpenMM step of round no. " + str(current_round) + "!!!")
+			if verbose: print("\n\nEnd of OpenMM step of round no. " + str(current_round) + "!!!")
 			create_csv_from_list_of_files(filestore + '/OpenMM_confs/total_results.csv', glob.glob(filestore + '/OpenMM_confs/per_peptide_results/*.log'))
-			results_csv = pretty_print_analytics(filestore + '/OpenMM_confs/total_results.csv')
+			results_csv = pretty_print_analytics(filestore + '/OpenMM_confs/total_results.csv', verbose=verbose)
 			results_csv.to_csv(filestore + '/OpenMM_confs/successful_conformations_statistics.csv', index = False)
 
 		else:
@@ -430,7 +456,7 @@ def apegen(args):
 			best_energy = results_csv['Affinity'].astype('float').min()
 			best_conformation = results_csv[results_csv['Affinity'].astype('float') == best_energy]
 			best_conformation_index = best_conformation['Peptide index'].values[0]
-			print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
+			if verbose: print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
 			copy_file(best_conf_dir + '/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
 				  	  best_conf_dir + '/min_energy_system.pdb')
 			copy_file(best_conf_dir + '/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
@@ -444,11 +470,11 @@ def apegen(args):
 			current_round += 1
 			
 	# Ending and final statistics
-	print("\n\nEnd of APE-Gen !!!")
+	print("\n\nEnd of APE-Gen")
 	best_conf_dir = 'OpenMM_confs' if score_with_openmm else 'SMINA_data'
 	create_csv_from_list_of_files(temp_files_storage + '/APE_gen_best_run_results.csv', 
 								  ["{}/{}/{}/min_energy.log".format(temp_files_storage,i,best_conf_dir) for i in range(1, num_rounds + 1)])
-	results_csv = pretty_print_analytics(temp_files_storage + '/APE_gen_best_run_results.csv')
+	results_csv = pretty_print_analytics(temp_files_storage + '/APE_gen_best_run_results.csv', verbose=True)
 
 if __name__ == "__main__":
     apegen(sys.argv[1:])

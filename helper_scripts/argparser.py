@@ -9,7 +9,7 @@ def APE_Gen_parser():
 	parser.add_argument("-l", "--num_loops", type=int, default=100, help='Number of loops to generate with RCD. (Note that the final number of sampled conformations may be less due to steric clashes.')
 	parser.add_argument("-t", "--RCD_dist_tol", type=float, default=1.0, help='RCD tolerance (in angstroms) of inner residues when performing IK')
 	parser.add_argument("-r", "--rigid_receptor", action="store_true", help='Disable sampling of receptor degrees of freedom specified in flex_res.txt')
-	parser.add_argument("-d", "--debug", action="store_true", help='Print extra information for debugging')
+	parser.add_argument("-v", "--verbose", action="store_true", help='Print extra information for debugging')
 	parser.add_argument("-p", "--save_only_pep_confs", action="store_true", help='Disable saving full conformations (peptide and MHC)')
 	#parser.add_argument("--n-mer-templates", default="", help='File with n-mer pdb templates.')
 	#parser.add_argument("--receptor-class-templates", default="", help='File with pdb receptor class templates')

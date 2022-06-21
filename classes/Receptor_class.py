@@ -1,4 +1,4 @@
-from helper_scripts.Ape_gen_macros import remove_file, merge_and_tidy_pdb, copy_file
+from helper_scripts.Ape_gen_macros import remove_file, merge_and_tidy_pdb, copy_file, verbose
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -69,7 +69,7 @@ def model_single_opt(filestore, num_models=10):
 
 	# Get top model
 	m = ok_models[0]
-	print("Top model: %s (DOPE score %.100f)" % (m['name'], m[key]))
+	if verbose(): print("Top model: %s (DOPE score %.100f)" % (m['name'], m[key]))
 
 	return m['name'], m[key]
 
@@ -91,7 +91,7 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 	# Routine for finding the best sequence match for homology modelling, as well as modelling itself
 
 	# First we search for the closest sequence match
-	print("Searching for the closest match in terms of sequence:")
+	if verbose(): print("Searching for the closest match in terms of sequence:")
 	best_record_list = []
 	best_score = 0 
 	for seq_record in SeqIO.parse("./helper_files/template_sequences.fasta", "fasta"):
@@ -105,15 +105,15 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 			best_score = alignments[0].score
 			best_record_list = []
 			best_record_list.append(seq_record.id)
-	print(best_record_list)
-	print("Closest match are the following alleles: ", best_record_list)
+	if verbose(): print(best_record_list)
+	if verbose(): print("Closest match are the following alleles: ", best_record_list)
 
 	# Secondly, emphasizing more on the peptide binding pocket, we fetch the pdb code that has the peptide
 	# with the closest sequence similarity to the peptide to be modelled. This is coming from the hypothesis that
 	# this structure will have similar binding cleft to accomodate the peptide?
 
 	# This is repeated code btw, see if you can make a function for this, it would be amazing
-	print("Fetching now the most appropriate template that will host the peptide in question:")
+	if verbose(): print("Fetching now the most appropriate template that will host the peptide in question:")
 	templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
 	templates = templates[templates['MHC'].isin(best_record_list)]
 	aligner = Align.PairwiseAligner()
@@ -127,7 +127,7 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 	result = templates.sample(n=1)
 	pdb_filename = result['pdb_code'].values[0]
 	new_allotype = result['MHC'].values[0]
-	print("Got " + pdb_filename + "! This template has MHC " + new_allotype)
+	if verbose(): print("Got " + pdb_filename + "! This template has MHC " + new_allotype)
 	copy_file('./new_templates/' + pdb_filename, filestore + '/receptor_template.pdb')
 
 	# Now that we found the pdb that is serving as the HLA template, take the sequence of that template
@@ -146,7 +146,7 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 	wd_to_return_to = os.getcwd()
 	os.chdir(wd_to_return_to + '/' + filestore)
 
-	print("Preparing target sequence")
+	if verbose(): print("Preparing target sequence")
 	f = open("target_sequence.pir", 'w')
 	f.write(">P1;target_sequence\n")
 	f.write("sequence::	 : :	 : :::-1.00:-1.00\n")
@@ -155,11 +155,11 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 
 	align_2d(filestore)
 
-	print("Creating model")
+	if verbose(): print("Creating model")
 	starttime = time.time()	
 	best_model, best_score = model_single_opt(filestore, num_models=2)
 	endtime = time.time()
-	print("Homology modelling took " + str(endtime - starttime) + " seconds.")
+	if verbose(): print("Homology modelling took " + str(endtime - starttime) + " seconds.")
 	os.chdir(wd_to_return_to)
 
 	return filestore + '/' + best_model, new_allotype
@@ -192,10 +192,10 @@ class Receptor(object):
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
 		if(allotype in templates['MHC'].tolist()):
 
-			print("Allotype found in our structural DB!")
+			if verbose(): print("Allotype found in our structural DB!")
 			templates = templates[templates['MHC'] == allotype]
 
-			print("Will try to get the one that is closer to the peptide_input:")
+			if verbose(): print("Will try to get the one that is closer to the peptide_input:")
 			# select the one closer to the whole sequence
 			aligner = Align.PairwiseAligner()
 			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
@@ -206,14 +206,14 @@ class Receptor(object):
 			templates['peptide_score'] = score_list
 			templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
 			pdb_filename = templates['pdb_code'].sample(n=1).values[0]
-			print("Got " + pdb_filename + "!")
+			if verbose(): print("Got " + pdb_filename + "!")
 			return(cls(allotype = allotype, pdb_filename = './new_templates/' + pdb_filename))
 		
 		# Check #2: Existing sequence
 		print("Allotype not found in our structural DB. Let's see if it's in our sequence DB...")
 		for seq_record in SeqIO.parse("./helper_files/MHC_data.fasta", "fasta"):
 			if seq_record.id == allotype:
-				print("Allotype found in our sequence DB! Modelling it through homology modelling:")
+				if verbose(): print("Allotype found in our sequence DB! Modelling it through homology modelling:")
 				pdb_filename, new_allotype = model_receptor(str(seq_record.seq), peptide_sequence, filestore)
 				return(cls(allotype = new_allotype, pdb_filename = pdb_filename))
 

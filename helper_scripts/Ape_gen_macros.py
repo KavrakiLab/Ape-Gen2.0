@@ -16,6 +16,15 @@ from nltk import ngrams
 
 ## MACROS
 
+# set verbose
+global verbose_var
+verbose_var = False
+def verbose():
+	return verbose_var
+def set_verbose(val):
+	global verbose_var
+	verbose_var = val
+
 # Three-to-one (and vice versa) AA transformation
 standard_three_to_one_letter_code = {'ARG':'R', 'HIS':'H', 'LYS':'K', 'ASP':'D', 'GLU':'E', \
 						  			 'SER':'S', 'THR':'T', 'ASN':'N', 'GLN':'Q', 'CYS':'C', \
@@ -196,7 +205,7 @@ def create_csv_from_list_of_files(csv_filename, list_of_files):
 			with open(filename, 'rb') as readfile:
 				shutil.copyfileobj(readfile, outfile)
 
-def pretty_print_analytics(csv_location):
+def pretty_print_analytics(csv_location, verbose=True):
 
 	results_csv = pd.read_csv(csv_location, names=['Round', 'Peptide index', 'Debug', 'Affinity'])
 	results_csv.sort_values(by=['Round', 'Peptide index'], inplace = True)
@@ -204,9 +213,10 @@ def pretty_print_analytics(csv_location):
 
 	results_csv = results_csv[results_csv['Affinity'] != '-']
 	no_of_final_conformations = results_csv.shape[0]
-	print("Total number of overall conformations: " + str(no_of_final_conformations))
-	print("\nAnalytics:")
-	print(results_csv.to_markdown(index = False))
+	if verbose:
+		print("Total number of overall conformations: " + str(no_of_final_conformations))
+		print("\nAnalytics:")
+		print(results_csv.to_markdown(index = False))
 	return results_csv
 
 
