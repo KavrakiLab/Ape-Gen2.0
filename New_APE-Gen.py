@@ -102,7 +102,9 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, anchors, 
+# def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, anchors, 
+# 								   peptide_template_anchors_xyz, anchor_tol, current_round):
+def peptide_refinement_and_scoring(peptide_index, peptide, filestore, receptor, 
 								   peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
@@ -114,34 +116,34 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	Cterm_location = filestore + '/input_to_RCD/C_ter.pdb'
 	assembled_peptide = new_filestore + '/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
-	peptide = Peptide.frompdb(assembled_peptide, anchors = anchors)
+	peptide = Peptide.frompdb(assembled_peptide, anchors=peptide.anchors, index=peptide_index)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
-	peptide.add_sidechains(new_filestore, peptide_index)
+	peptide.add_sidechains(new_filestore)
 
 	# 3. Do PTMs
-	peptide.perform_PTM(new_filestore, peptide_index, PTM_list)
+	peptide.perform_PTM(new_filestore)
 
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
-	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, peptide_index, current_round)
+	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, peptide.index, current_round)
 	if(peptide_is_not_valid): return
 	# TODO: access and define a new receptor, then do CSP on that receptor
 
 	# 4b. Optimize and score with SMINA (or other options, depending on args)
-	peptide.dock_score_with_SMINA(new_filestore, receptor, peptide_index) 
+	peptide.dock_score_with_SMINA(new_filestore, receptor) 
 
 	# 5. Anchor filtering (based on anchor tolerance argument) (improvement from previous version)
-	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
+	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide.index, current_round)
 	if(peptide_is_not_valid): return
 
 	# 6. Fix flexible residue co-ordinates if receptor is flexible
 	if receptor.doMinimization:
-		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, peptide_index, current_round)
+		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, current_round)
 		if(peptide_is_not_valid): return
 
 	# 7. Create the peptide + MHC ensemble files
-	peptide.create_peptide_receptor_complexes(new_filestore, receptor, peptide_index)
+	peptide.create_peptide_receptor_complexes(new_filestore, receptor, peptide.index)
 
 	# Done!
 	return
@@ -301,8 +303,8 @@ def apegen(args):
 						filestore + '/SMINA_data/minimized_receptors',	\
 						filestore + '/SMINA_data/Anchor_filtering',		\
 						filestore + '/SMINA_data/pMHC_complexes/')
-
-		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
+					# peptide_index, peptide, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round
+		arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
