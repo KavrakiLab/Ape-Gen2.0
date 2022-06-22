@@ -19,13 +19,26 @@ from openmm.app import PDBFile
 
 # MODELLER
 try:
-	from modeller import *
-	from modeller.automodel import *
+	# with warnings.catch_warnings():
+	# 	warnings.simplefilter("ignore")
+	# 	import modeller
+	# 	import modeller.automodel as automodel
+	# 	print("***********\nsuccessful import")
+	import modeller
+	import modeller.automodel as automodel
 except:
-	print("Error with importing Modeller: Make sure license key is correct.")
-	sys.exit(0)
+	modeller = ImportError
+	automodel = ImportError
+	print("***********\nbad import")
+
+	# print("Error with importing Modeller: Make sure license key is correct.")
+	# sys.exit(0)
 
 def model_single_opt(filestore, num_models=10):
+	# if the modeller import was unsuccessful, quit
+	if (modeller == ImportError or automodel == ImportError):
+		print("Error with importing Modeller: Make sure license key is correct.")
+		sys.exit(0)
 
 	log.none()
 	env = Environ()
@@ -87,6 +100,10 @@ def align_2d(filestore):
 	aln.write(file='target_sequence-receptor_template.pap', alignment_format='PAP')
 
 def model_receptor(allele_sequence, peptide_sequence, filestore):
+	# if the modeller import was unsuccessful, quit
+	if (modeller == ImportError or automodel == ImportError):
+		print("Error with importing Modeller: Make sure license key is correct.")
+		sys.exit(0)
 
 	# Routine for finding the best sequence match for homology modelling, as well as modelling itself
 
