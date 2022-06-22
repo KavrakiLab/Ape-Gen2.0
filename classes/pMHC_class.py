@@ -1,9 +1,13 @@
 import pymol2
 
+<<<<<<< HEAD
 from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir,	   \
 											move_batch_of_files, merge_and_tidy_pdb,			   \
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, verbose
+=======
+from helper_scripts.Ape_gen_macros import remove_file, initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
+>>>>>>> made os.remove a macro
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
