@@ -19,20 +19,13 @@ from openmm.app import PDBFile
 
 # MODELLER
 try:
-	# with warnings.catch_warnings():
-	# 	warnings.simplefilter("ignore")
-	# 	import modeller
-	# 	import modeller.automodel as automodel
-	# 	print("***********\nsuccessful import")
-	import modeller
-	import modeller.automodel as automodel
+	with warnings.catch_warnings():
+		warnings.simplefilter("ignore")
+		import modeller
+		import modeller.automodel as automodel\
 except:
 	modeller = ImportError
 	automodel = ImportError
-	print("***********\nbad import")
-
-	# print("Error with importing Modeller: Make sure license key is correct.")
-	# sys.exit(0)
 
 def model_single_opt(filestore, num_models=10):
 	# if the modeller import was unsuccessful, quit

@@ -212,7 +212,7 @@ def apegen(args):
 	peptide = Peptide.init_peptide(peptide_input)
 	PTM_list = peptide.PTM_list
 
-	receptor, receptor_template_file = Receptor.init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide.sequence)
+	receptor, receptor_template_file = Receptor.init_receptor(receptor_class, temp_files_storage +  '/1_MODELLER_output', peptide.sequence)
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
 	
