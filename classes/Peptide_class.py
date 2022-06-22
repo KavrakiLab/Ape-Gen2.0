@@ -12,10 +12,6 @@ import pickle as pkl
 
 from helper_scripts.Ape_gen_macros import extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
-# PDBFIXER
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
-
 from subprocess import call
 
 from pdbtools import pdb_tofasta, pdb_delelem
@@ -142,32 +138,9 @@ class Peptide(object):
 		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchor_union])
 
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
-			       sequence = peptide_sequence, 
-			       anchors = peptide_anchors), template_anchors
+				   sequence = peptide_sequence, 
+				   anchors = peptide_anchors), template_anchors
 
-	def add_sidechains(self, filestore, peptide_index):
-		fixer = PDBFixer(filename=self.pdb_filename)
-		fixer.findMissingResidues()
-		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-		fixer.findMissingAtoms()
-		fixer.addMissingAtoms()
-		fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
-		self.pdb_filename = filestore + '/add_sidechains/PTMed_' + str(peptide_index) + '.pdb'
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
-
-		# So my hypothesis now here is that Modeller that is being used to add hydrogens, has a specification
-		# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
-		# Let's delete those entries and see how this goes:
-		# UPDATE: It's probably not this, uncomment if necessary
-		#delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
-		#overwritten = ''.join(delete_modeller_hydrogens)
-		#with open(self.pdb_filename, 'w') as PTMed_file:
-		#	PTMed_file.write(overwritten)
-
-		# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
-		copy_file(filestore + '/add_sidechains/PTMed_' + str(peptide_index) + '.pdb', 
-							filestore + '/PTMed_peptides/PTMed_' + str(peptide_index) + '.pdb')
 
 	def perform_PTM(self, filestore, peptide_index, PTM_list):
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
@@ -223,35 +196,35 @@ class Peptide(object):
 		self.pdb_filename =  filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb"
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
-        		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
-        		  " --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
-        		  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-        		  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
-        		  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
+				  " --autobox_add 8 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
 	def score_with_SMINA(self, filestore, receptor, peptide_index):
-		self.pdb_filename = filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb"	
+		self.pdb_filename = filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb" 
 		call(["smina -q --score_only --ligand " + self.pdbqt_filename + \
 			  " --receptor " + receptor.pdbqt_filename + " --out " + self.pdb_filename + \
 			  " > " + filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
-		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(peptide_index) + ".pdb")	
+		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(peptide_index) + ".pdb")    
 
 	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round):
 
@@ -338,13 +311,13 @@ class Peptide(object):
 			# CA location
 			CA_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'CA'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(CA_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-			                              rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			CA_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			# C location
 			C_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'C'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(C_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-			                              rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			#print(CA_loc, C_loc)
@@ -359,7 +332,7 @@ class Peptide(object):
 				return True
 
 			sub_pdb = sub_pdb.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
-			list_of_dataframes.append(sub_pdb)	
+			list_of_dataframes.append(sub_pdb)  
 
 		# When done, bring the .pdb file columns to the appropriate order
 		renamed_atoms = pd.concat(list_of_dataframes)

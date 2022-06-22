@@ -1,5 +1,5 @@
 from helper_scripts import argparser
-from helper_scripts.Ape_gen_macros import replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
+from helper_scripts.Ape_gen_macros import add_sidechains, replace_chains, initialize_dir, merge_and_tidy_pdb, sequence_PTM_processing, create_csv_from_list_of_files, copy_file, pretty_print_analytics, move_batch_of_files, copy_batch_of_files, split_receptor_and_peptide, remove_remarks_and_others_from_pdb, replace_HETATM, delete_elements
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -46,7 +46,7 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 	overwritten = ''.join(overwritten)
 	with open(peptide_file, 'w') as peptide_handler:
 		peptide_handler.write(overwritten)
-	peptide_handler.close()	
+	peptide_handler.close() 
 	overwritten = replace_HETATM(peptide_file)
 	overwritten = ''.join(overwritten)
 	with open(peptide_file, 'w') as peptide_handler:
@@ -124,7 +124,7 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	peptide = Peptide.frompdb(assembled_peptide, anchors = anchors)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
-	peptide.add_sidechains(new_filestore, peptide_index)
+	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=peptide_index, add_hydrogens=True)
 
 	# 3. Do PTMs
 	peptide.perform_PTM(new_filestore, peptide_index, PTM_list)
@@ -214,9 +214,9 @@ def apegen(args):
 	temp_files_storage = args.dir
 	initialize_dir(temp_files_storage)
 
-    # 1. INPUT PROCESSING
+	# 1. INPUT PROCESSING
 
-    # 1a. Receptor
+	# 1a. Receptor
 	if debug: print("Processing Receptor Input")
 	if receptor_class.endswith(".pdb"):
 		# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
@@ -246,7 +246,7 @@ def apegen(args):
 		print("Receptor Allotype: " + receptor.allotype)
 		print("Receptor Template: " + receptor_template.pdb_filename)
 
-    # 1b. Peptide
+	# 1b. Peptide
 	if debug: print("Processing Peptide Input")
 	if peptide_input.endswith(".pdb"):
 		# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
@@ -257,7 +257,7 @@ def apegen(args):
 		# peptide = Peptide.fromsequence(peptide_input)
 		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
 
-	# Peptide Template is also a pMHC complex though	
+	# Peptide Template is also a pMHC complex though    
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
 
 	# Get peptide template anchor positions for anchor tolerance filtering
@@ -286,7 +286,7 @@ def apegen(args):
 	if (('phosphorylate 1' in PTM_list) or ('phosphorylate ' + str(len(peptide.sequence)) in PTM_list)) and (score_with_openmm):
 		sys.exit("\nERROR: Phosphorylation in N-terminus or C-terminus and openMM optimization is NOT supported. Force Field parameters are not released yet. Please omit OpenMM step for modelling this type of PTM.")
 	for PTM in PTM_list:
-		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):	
+		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):   
 			sys.exit("\nERROR: PTM other than phosphorylation is not yet supported with OpenMM. Omit the OpenMM step and stay tuned for changes!")
 
 	# 2. MAIN LOOP
@@ -304,7 +304,7 @@ def apegen(args):
 		receptor_template.align(reference = peptide_template, filestore = filestore)
 		if debug: print("Preparing input to RCD")
 		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore, pep_seq = peptide.sequence)
-		receptor_template.add_sidechains(filestore = filestore)
+		add_sidechains(receptor_template.pdb_filename, filestore, keep_IDs=True)
 
 		# Perform RCD on the receptor given peptide:
 		if debug: print("Performing RCD")
@@ -347,8 +347,8 @@ def apegen(args):
 		# Code for non-parallel execution and debugging
 
 		#for argument in arg_list:
-		#	print(argument)
-		#	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7])
+		#   print(argument)
+		#   peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7])
 
 		# Print and keep statistics
 		best_conf_dir = filestore + '/4_SMINA_data'
@@ -438,9 +438,9 @@ def apegen(args):
 			best_conformation_index = best_conformation['Peptide index'].values[0]
 			print("\nStoring best conformation no. " + str(best_conformation_index) + " with Affinity = " + str(best_energy))
 			copy_file(best_conf_dir + '/pMHC_complexes/pMHC_' + str(best_conformation_index) + '.pdb',
-				  	  best_conf_dir + '/min_energy_system.pdb')
+					  best_conf_dir + '/min_energy_system.pdb')
 			copy_file(best_conf_dir + '/per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
-				  	  best_conf_dir + '/min_energy.log')
+					  best_conf_dir + '/min_energy.log')
 
 			# Decide where and how to pass the information for the next round
 			receptor_template.pdb_filename = best_conf_dir + '/min_energy_system.pdb'
@@ -457,4 +457,4 @@ def apegen(args):
 	results_csv = pretty_print_analytics(temp_files_storage + '/APE_gen_best_run_results.csv')
 
 if __name__ == "__main__":
-    apegen(sys.argv[1:])
+	apegen(sys.argv[1:])
