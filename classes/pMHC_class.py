@@ -18,10 +18,6 @@ from openmm import *
 from openmm.unit import *
 from sys import stdout
 
-# PDBFIXER
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
-
 class pMHC(object):
 
 	def __init__(self, pdb_filename, peptide = None, receptor = None):
@@ -56,13 +52,6 @@ class pMHC(object):
 		#pymol.cmd.quit()
 		p1.stop()
 
-	def add_sidechains(self, filestore):
-		fixer = PDBFixer(filename=self.pdb_filename)
-		fixer.findMissingResidues()
-		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-		fixer.findMissingAtoms()
-		fixer.addMissingAtoms()
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'), keepIds=True)
 
 	def prepare_for_RCD(self, reference, filestore, pep_seq):
 
@@ -150,6 +139,18 @@ class pMHC(object):
 		loops.close()
 
 		# Perform RCD:
+<<<<<<< HEAD
+		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/input_to_RCD/loops.txt >> " + filestore + "/RCD_data/rcd.log 2>&1"], shell=True)
+		
+		# Move files to back to destination folder (think about making a function for this)
+		move_batch_of_files(filestore + '/input_to_RCD/', filestore + '/RCD_data', query = "anchored_pMHC_")
+
+		# Split the output into files, as the output .pdb has many models       
+		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input([filestore + "/RCD_data/anchored_pMHC_closed.pdb"],
+																  ), outname = "model")
+		initialize_dir(filestore + '/RCD_data/splits')  
+		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
+=======
 		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/2_input_to_RCD/loops.txt >> " + filestore + "/3_RCD_data/rcd.log 2>&1"], shell=True)
  		
  		# Move files to back to destination folder (think about making a function for this)
@@ -160,6 +161,7 @@ class pMHC(object):
 																  ), outname = "model")
 		initialize_dir(filestore + '/3_RCD_data/splits')	
 		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query = "model")
+>>>>>>> main
 		os.remove(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, reference, pep_seq, anchors):
@@ -270,8 +272,8 @@ class pMHC(object):
 		# Minimize energy
 		simulation.minimizeEnergy()
 		simulation.reporters.append(app.StateDataReporter(stdout, 100, step=True, potentialEnergy=True, 
-    								temperature=True, progress=False, remainingTime=True, speed=True, 
-    								totalSteps=250000, separator='\t'))
+									temperature=True, progress=False, remainingTime=True, speed=True, 
+									totalSteps=250000, separator='\t'))
 
 		# Write results to a new file if energy is small enough
 		energy = simulation.context.getState(getEnergy=True).getPotentialEnergy() / kilojoule_per_mole
@@ -280,5 +282,5 @@ class pMHC(object):
 			path, file = os.path.split(self.pdb_filename)
 			r = PDBReporter(filestore + '/5_openMM_conformations/minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
-   			
+			
 		return best_energy 
