@@ -14,6 +14,10 @@ from constraint import *
 
 from nltk import ngrams
 
+# PDBFIXER
+from pdbfixer import PDBFixer
+from openmm.app import PDBFile
+
 ## MACROS
 
 # set verbose
@@ -102,6 +106,30 @@ def copy_batch_of_files(src, dst, query):
 def remove_file(filename):
 	os.remove(filename)
 
+def add_sidechains(pdb_filename, filestore, peptide_idx=-1, remove_heterogens=True,   \
+																add_hydrogens=False,    \
+																add_solvent=False,      \
+																keep_IDs=False          ):
+	fixer = PDBFixer(filename=pdb_filename)
+	fixer.findMissingResidues()
+	if remove_heterogens: fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
+	fixer.findMissingAtoms()
+	fixer.addMissingAtoms()
+	if add_hydrogens: fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+	if add_solvent: fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
+	if peptide_idx != -1:
+			pdb_filename = filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb'
+	
+	fp = open(pdb_filename, 'w')
+	PDBFile.writeFile(fixer.topology, fixer.positions, fp, keepIds=keep_IDs)
+	fp.close()
+
+	if peptide_idx != -1:
+		copy_file(filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb', 
+							filestore + '/PTMed_peptides/PTMed_' + str(peptide_idx) + '.pdb')
+	return pdb_filename
+
+
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
 	sorteded = pdb_sort.run(merged, sorting_keys='-RC') # Potentially breaking -> Not working?
@@ -112,7 +140,6 @@ def merge_and_tidy_pdb(list_of_pdbs, dst):
 	pdb_file.close()
 
 def apply_function_to_file(func, input_filename, output_filename="", **kwargs):
-	# TODO: update so that the output file gets written to
 	if output_filename == "": output_filename = input_filename
 
 	overwritten = func(input_filename, **{key: value for key, value in kwargs.items() if key in func.__code__.co_varnames})

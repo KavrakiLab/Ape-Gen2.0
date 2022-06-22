@@ -46,6 +46,7 @@ RUN conda env create -f /environment.yml
 RUN echo "source activate apegen" >> ~/.bashrc
 ENV PATH "/conda/envs/apegen/bin:$PATH"
 
+
 # This is manual, but won't work
 #RUN conda create --name apegen python=3.6 \
 #    && echo "conda activate apegen" >> ~/.bashrc \
@@ -82,7 +83,11 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 
+# replace files that cause warnings and errors
+COPY /replacement_files/replace_files.sh /replace_files.sh
+RUN echo "sh /replace_files.sh" >> ~/.bashrc
+
 ENTRYPOINT ["bash"]
 
-# Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
-# docker build . -t kavrakilab/apegen2.0
+# # Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
+# # docker build . -t kavrakilab/apegen2.0

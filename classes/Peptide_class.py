@@ -177,29 +177,29 @@ class Peptide(object):
 		return template_anchors
 
 
-	def add_sidechains(self, filestore):
-		fixer = PDBFixer(filename=self.pdb_filename)
-		fixer.findMissingResidues()
-		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-		fixer.findMissingAtoms()
-		fixer.addMissingAtoms()
-		fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-		#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
-		self.pdb_filename = filestore + '/add_sidechains/PTMed_' + str(self.index) + '.pdb'
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
+	# def add_sidechains(self, filestore):
+	# 	fixer = PDBFixer(filename=self.pdb_filename)
+	# 	fixer.findMissingResidues()
+	# 	fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
+	# 	fixer.findMissingAtoms()
+	# 	fixer.addMissingAtoms()
+	# 	fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+	# 	#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
+	# 	self.pdb_filename = filestore + '/add_sidechains/PTMed_' + str(self.index) + '.pdb'
+	# 	PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
 
-		# So my hypothesis now here is that Modeller that is being used to add hydrogens, has a specification
-		# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
-		# Let's delete those entries and see how this goes:
-		# UPDATE: It's probably not this, uncomment if necessary
-		#delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
-		#overwritten = ''.join(delete_modeller_hydrogens)
-		#with open(self.pdb_filename, 'w') as PTMed_file:
-		#	PTMed_file.write(overwritten)
+	# 	# So my hypothesis now here is that Modeller that is being used to add hydrogens, has a specification
+	# 	# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
+	# 	# Let's delete those entries and see how this goes:
+	# 	# UPDATE: It's probably not this, uncomment if necessary
+	# 	#delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
+	# 	#overwritten = ''.join(delete_modeller_hydrogens)
+	# 	#with open(self.pdb_filename, 'w') as PTMed_file:
+	# 	#	PTMed_file.write(overwritten)
 
-		# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
-		copy_file(filestore + '/add_sidechains/PTMed_' + str(self.index) + '.pdb', 
-							filestore + '/PTMed_peptides/PTMed_' + str(self.index) + '.pdb')
+	# 	# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
+	# 	copy_file(filestore + '/add_sidechains/PTMed_' + str(self.index) + '.pdb', 
+	# 						filestore + '/PTMed_peptides/PTMed_' + str(self.index) + '.pdb')
 
 	def perform_PTM(self, filestore):
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
