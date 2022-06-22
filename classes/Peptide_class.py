@@ -303,11 +303,11 @@ class Peptide(object):
 	def fix_flexible_residues(self, filestore, receptor, peptide_index, current_round):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
-		#minimized_receptor_loc = filestore + "/SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
+		#minimized_receptor_loc = filestore + "/4_SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
 		#if receptor.doMinimization:
 		#	call(["python ./helper_scripts/makeflex.py " + \
-		#		  filestore + "/SMINA_data/receptor_for_smina.pdb " + \
-		#		  filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
+		#		  filestore + "/4_SMINA_data/receptor_for_smina.pdb " + \
+		#		  filestore + "/4_SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
 		#		  minimized_receptor_loc],
 		#		  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
 

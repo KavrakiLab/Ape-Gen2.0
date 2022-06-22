@@ -12,12 +12,12 @@ def actual_function():
 
 	# Load flexible receptor
 	flex_receptor = PandasPdb()
-	flex_receptor.read_pdb("./intermediate_files/1/SMINA_data/flexible_receptors/receptor_58.pdb")
+	flex_receptor.read_pdb("./intermediate_files/1/4_SMINA_data/flexible_receptors/receptor_58.pdb")
 	flex_receptor_df = flex_receptor.df['ATOM']
 
 	# Load rigid receptor
 	rigid_receptor = PandasPdb()
-	rigid_receptor.read_pdb("./intermediate_files/1/SMINA_data/receptor_for_smina.pdb")
+	rigid_receptor.read_pdb("./intermediate_files/1/4_SMINA_data/receptor_for_smina.pdb")
 	rigid_receptor_df = rigid_receptor.df['ATOM']
 	rigid_receptor_df = rigid_receptor_df[rigid_receptor_df['chain_id'] == 'A'].copy()
 
@@ -91,11 +91,11 @@ def what_does_the_fox_say():
 def actual_function_2():
 
 	original_ppdb = PandasPdb()
-	original_ppdb.read_pdb("./intermediate_files/1/SMINA_data/receptor_for_smina.pdb")
+	original_ppdb.read_pdb("./intermediate_files/1/4_SMINA_data/receptor_for_smina.pdb")
 	original_pdb_df = original_ppdb.df['ATOM']
 		
 	flexible_ppdb = PandasPdb()
-	flexible_ppdb.read_pdb("./intermediate_files/1/SMINA_data/flexible_receptors/receptor_47.pdb")
+	flexible_ppdb.read_pdb("./intermediate_files/1/4_SMINA_data/flexible_receptors/receptor_47.pdb")
 	flexible_pdb_df = flexible_ppdb.df['ATOM']
 
 	flexible_residues = pd.unique(flexible_pdb_df['residue_number'])
@@ -108,7 +108,7 @@ def renaming_function():
 
 	# Making the CONECT list first:
 	edge_list = []
-	taken = remove_remarks_and_others_from_pdb("./intermediate_files/1/SMINA_data/flexible_receptors/receptor_24.pdb", 
+	taken = remove_remarks_and_others_from_pdb("./intermediate_files/1/4_SMINA_data/flexible_receptors/receptor_24.pdb", 
 																		           records=("CONECT "))
 	conect_fields = ''.join(taken)
 	for line in conect_fields.split('\n'):
@@ -121,11 +121,11 @@ def renaming_function():
 			pass
 
 	original_ppdb = PandasPdb()
-	original_ppdb.read_pdb("./intermediate_files/1/SMINA_data/receptor_for_smina.pdb")
+	original_ppdb.read_pdb("./intermediate_files/1/4_SMINA_data/receptor_for_smina.pdb")
 	original_pdb_df = original_ppdb.df['ATOM']
 
 	flexible_ppdb = PandasPdb()
-	flexible_ppdb.read_pdb("./intermediate_files/1/SMINA_data/flexible_receptors/receptor_24.pdb")
+	flexible_ppdb.read_pdb("./intermediate_files/1/4_SMINA_data/flexible_receptors/receptor_24.pdb")
 	flexible_pdb_df = flexible_ppdb.df['ATOM']
 
 	flexible_residues = pd.unique(flexible_pdb_df['residue_number'])
@@ -158,12 +158,12 @@ def renaming_function():
 	flexible_ppdb.df['ATOM'] = pd.concat(list_of_dataframes)
 
 	original_ppdb.df['ATOM'] = original_pdb_df[(~(original_pdb_df['residue_number'].isin(flexible_residues))) | (original_pdb_df['atom_name'].isin(["N", "O", "H"]))]
-	original_ppdb.to_pdb(path=filestore + "/SMINA_data/temp.pdb", records=['ATOM'], gz=False, append_newline=True)
-	flexible_ppdb.to_pdb(path=filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb", records=['ATOM'], gz=False, append_newline=True)
-	merge_and_tidy_pdb([filestore + "/SMINA_data/temp.pdb", 
-											filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb"],
+	original_ppdb.to_pdb(path=filestore + "/4_SMINA_data/temp.pdb", records=['ATOM'], gz=False, append_newline=True)
+	flexible_ppdb.to_pdb(path=filestore + "/4_SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb", records=['ATOM'], gz=False, append_newline=True)
+	merge_and_tidy_pdb([filestore + "/4_SMINA_data/temp.pdb", 
+											filestore + "/4_SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb"],
 											minimized_receptor_loc)
-	os.remove(filestore + "/SMINA_data/temp.pdb")
+	os.remove(filestore + "/4_SMINA_data/temp.pdb")
 
 def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 
