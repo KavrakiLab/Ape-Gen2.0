@@ -27,7 +27,7 @@ class pMHC(object):
 		self.anchor_xyz = None
 
 	def align(self, reference, filestore):
-		initialize_dir(filestore + '/alignment_files')
+		initialize_dir(filestore + '/1_alignment_files')
 		#pymol.pymol_argv = ['pymol','-c']
 		#pymol.finish_launching()
 		p1 = pymol2.PyMOL()
@@ -37,16 +37,16 @@ class pMHC(object):
 
 		p1.cmd.align("mobile & chain A", "ref & chain A")
 
-		self.pdb_filename = filestore + '/alignment_files/receptor.pdb'
+		self.pdb_filename = filestore + '/1_alignment_files/receptor.pdb'
 		p1.cmd.save(self.pdb_filename, "mobile")
-		p1.cmd.save(filestore + '/alignment_files/peptide.pdb', "ref")
+		p1.cmd.save(filestore + '/1_alignment_files/peptide.pdb', "ref")
 
 		# Also store receptor without peptide and keep that on the receptor part
 		# CAUTION: If receptor template is a result of homology modelling, the peptide is ignored there, so
 		# the receptor will already be without a peptide to begin with. This does not affect this step at all
 		# however
 		p1.cmd.create("mobile_sans_peptide", "mobile & chain A")
-		self.receptor.pdb_filename = filestore + '/alignment_files/receptor_sans_peptide.pdb'
+		self.receptor.pdb_filename = filestore + '/1_alignment_files/receptor_sans_peptide.pdb'
 		p1.cmd.save(self.receptor.pdb_filename, "mobile_sans_peptide")
 
 		#pymol.cmd.quit()
@@ -60,14 +60,14 @@ class pMHC(object):
 		# It removes the peptide from the receptor template
 		# It unifies those results, making the receptor + anchors that we want to model using RCD
 
-		initialize_dir(filestore + '/input_to_RCD')
+		initialize_dir(filestore + '/2_input_to_RCD')
 
 		# First, delete the peptide from the receptor template:
 		ppdb_receptor = PandasPdb()
 		ppdb_receptor.read_pdb(self.pdb_filename)
 		pdb_df_receptor = ppdb_receptor.df['ATOM']
 		ppdb_receptor.df['ATOM'] = ppdb_receptor.df['ATOM'][ppdb_receptor.df['ATOM']['chain_id'] != 'C']
-		self.pdb_filename = filestore + '/input_to_RCD/receptor.pdb'
+		self.pdb_filename = filestore + '/2_input_to_RCD/receptor.pdb'
 		ppdb_receptor.to_pdb(path=self.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
 
 		# Secondly, keep the anchors and the backbone from the peptide pdb
@@ -106,39 +106,40 @@ class pMHC(object):
 
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
-		anchor_pdb = filestore + '/input_to_RCD/peptide.pdb'
+		anchor_pdb = filestore + '/2_input_to_RCD/peptide.pdb'
 		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
 
 		# Finally, merge those two to create the anchored MHC (peptide contains only the anchors)
 		# We need to rename B to C, because for some reason C becomes B
-		anchored_MHC_file_name = filestore + '/input_to_RCD/anchored_pMHC.pdb'
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC.pdb'
 		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
 		self.pdb_filename = anchored_MHC_file_name
 
 		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
 		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == 1]
 		ppdb_peptide.df['ATOM'] = N_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/N_ter.pdb', 
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
 
 		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == len(pep_seq)]
 		ppdb_peptide.df['ATOM'] = C_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/input_to_RCD/C_ter.pdb', 
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/C_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
 
 		# DONE!
 
 	def RCD(self, peptide, RCD_dist_tol, num_loops, filestore):
 
-		initialize_dir(filestore + '/RCD_data')
+		initialize_dir(filestore + '/3_RCD_data')
 
 		# Create loops.txt file
 		last_non_anchor = len(peptide.sequence) - 2
-		with open(filestore + "/input_to_RCD/loops.txt", 'w') as loops:
-			loops.write(filestore + "/input_to_RCD/anchored_pMHC.pdb 3 " + str(last_non_anchor) + " C " + peptide.sequence[2:last_non_anchor])
+		with open(filestore + "/2_input_to_RCD/loops.txt", 'w') as loops:
+			loops.write(filestore + "/2_input_to_RCD/anchored_pMHC.pdb 3 " + str(last_non_anchor) + " C " + peptide.sequence[2:last_non_anchor])
 		loops.close()
 
 		# Perform RCD:
+<<<<<<< HEAD
 		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/input_to_RCD/loops.txt >> " + filestore + "/RCD_data/rcd.log 2>&1"], shell=True)
 		
 		# Move files to back to destination folder (think about making a function for this)
@@ -149,6 +150,18 @@ class pMHC(object):
 																  ), outname = "model")
 		initialize_dir(filestore + '/RCD_data/splits')  
 		move_batch_of_files('./', filestore + '/RCD_data/splits', query = "model")
+=======
+		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/2_input_to_RCD/loops.txt >> " + filestore + "/3_RCD_data/rcd.log 2>&1"], shell=True)
+ 		
+ 		# Move files to back to destination folder (think about making a function for this)
+		move_batch_of_files(filestore + '/2_input_to_RCD/', filestore + '/3_RCD_data', query = "anchored_pMHC_")
+
+		# Split the output into files, as the output .pdb has many models		
+		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input([filestore + "/3_RCD_data/anchored_pMHC_closed.pdb"],
+																  ), outname = "model")
+		initialize_dir(filestore + '/3_RCD_data/splits')	
+		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query = "model")
+>>>>>>> main
 		os.remove(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, reference, pep_seq, anchors):
@@ -200,13 +213,13 @@ class pMHC(object):
 			conect = replace_CONECT_fields('./PTM_residue_templates/' + residue_name + '.conect',
 										   sub_pdb, external_bonds_list)
 			conected = ''.join(conect)
-			conect_file = filestore + '/OpenMM_confs/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
+			conect_file = filestore + '/5_openMM_conformations/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
 			with open(conect_file, 'w') as conect_handler:
 				conect_handler.write(conected)
 
 			file_list.append(conect_file)
 
-		self.pdb_filename = filestore + '/OpenMM_confs/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
+		self.pdb_filename = filestore + '/5_openMM_conformations/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
 		merge_connect_fields(file_list, self.pdb_filename)
 
 	def minimizeConf(self, filestore, best_energy, device='CPU'):
@@ -267,7 +280,7 @@ class pMHC(object):
 		if energy < best_energy:
 			best_energy = energy
 			path, file = os.path.split(self.pdb_filename)
-			r = PDBReporter(filestore + '/OpenMM_confs/minimized_complexes/' + file, 1)
+			r = PDBReporter(filestore + '/5_openMM_conformations/minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
 			
 		return best_energy 

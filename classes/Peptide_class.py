@@ -43,22 +43,16 @@ class Peptide(object):
 		except KeyError as e:
 			print("There is something wrong with your .pdb 3-letter amino acid notation")
 		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
-	
-	@classmethod
-	def fromsequence(cls, peptide_sequence):
-		# Initialize peptide from a sequence -> Fetch template!
-		templates = pd.read_csv("./template_files/n-mer-templates.csv")
-		sequence_length = len(re.sub('[a-z]', '', peptide_sequence)) # Remove PTMs when fetching the template
-		peptide_template = templates[templates['Pep_Length'] == sequence_length]['Template'].values[0]
-		return cls(pdb_filename = ('./templates/' + peptide_template), sequence = peptide_sequence)
 
 	@classmethod
-	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors):
+	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv):
 
 		# Current policy of selecting/chosing peptide templates is:
 		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 		sequence_length = len(re.sub('[a-z]', '', peptide_sequence_noPTM)) 
 		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
+
+		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
 		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
 		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
@@ -68,6 +62,7 @@ class Peptide(object):
 			print("Determining anchors for given peptide sequence and allele allotype")
 			# Load the MHCflurry frequencies
 			frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
+
 			frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
 			frequencies['X'] = np.zeros(frequencies.shape[0])
 			frequencies_alleles = pd.unique(frequencies['allele'])
@@ -76,10 +71,18 @@ class Peptide(object):
 				print("Receptor allotype has a known MHC binding motif!")
 				peptide_features = extract_features(peptide_sequence_noPTM, receptor_allotype, frequencies)
 				anchor_predictors = pkl.load(open("./helper_files/anchor_predictors.pkl", "rb"))
+
+				ranges = list(range(len(anchor_predictors[0])))
+				# Routine that does not take into account the random forests that used the datapoint as training data
+				if cv != '':
+					key = receptor_allotype + '-' + peptide_sequence
+					for i in range(len(anchor_predictors[1])):
+						if key in list(anchor_predictors[1][i]):
+							ranges.remove(i)	
 				predictions = np.zeros(sequence_length)
-				for i in range(len(anchor_predictors[0])):
+				for i in ranges:
 					predictions += anchor_predictors[0][i].predict(np.vstack(peptide_features))
-				predictions /= len(anchor_predictors[0])
+				predictions /= len(ranges)
 				anchors = list(np.argwhere(predictions >= 0.5).flatten() + 1)
 				anchors = ",".join(map(str, anchors))
 			else:
@@ -156,13 +159,8 @@ class Peptide(object):
 		with open(self.pdb_filename, 'w') as PTMed_file:
 			PTMed_file.write(overwritten)
 
-		# B. A weird H01 pymol hydrogen that I want to delete. This is added to other residues during the PTM, so I need to remove it:
-		residue_list = list(range(1, len(self.sequence)))
-		for ptm in PTM_list:
-			PTM, selection = ptm.split(' ', 1)
-			residue_list.remove(int(selection))
-
-		delete_pymol_residues = delete_elements(self.pdb_filename, ["H01"], chains=["C"], residues=residue_list)
+		# B. Weird H0 pymol hydrogens that I want to delete. This is added to other residues during the PTM, so I need to remove them
+		delete_pymol_residues = delete_elements(self.pdb_filename, ["H0"], chains=["C"])
 		overwritten_2 = ''.join(delete_pymol_residues)
 		with open(self.pdb_filename, 'w') as PTMed_file:
 			PTMed_file.write(overwritten_2)
@@ -278,13 +276,13 @@ class Peptide(object):
 	def fix_flexible_residues(self, filestore, receptor, peptide_index, current_round):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
-		#minimized_receptor_loc = filestore + "/SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
+		#minimized_receptor_loc = filestore + "/4_SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
 		#if receptor.doMinimization:
-		#   call(["python ./helper_scripts/makeflex.py " + \
-		#         filestore + "/SMINA_data/receptor_for_smina.pdb " + \
-		#         filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
-		#         minimized_receptor_loc],
-		#         stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
+		#	call(["python ./helper_scripts/makeflex.py " + \
+		#		  filestore + "/4_SMINA_data/receptor_for_smina.pdb " + \
+		#		  filestore + "/4_SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
+		#		  minimized_receptor_loc],
+		#		  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
 
 		# Alternative scenario as makeflex.py is probably unstable: Solve the CSP using the CONECT fields to determine the true identity of the atoms
 
