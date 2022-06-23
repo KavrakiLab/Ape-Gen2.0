@@ -45,7 +45,7 @@ class Peptide(object):
 		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
 
 	@classmethod
-	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv):
+	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv=''):
 
 		# Current policy of selecting/chosing peptide templates is:
 		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
