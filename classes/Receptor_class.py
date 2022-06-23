@@ -8,6 +8,7 @@ from subprocess import call
 import sys
 import time
 import re
+import warnings
 
 from Bio import Align
 from Bio import SeqIO
@@ -21,8 +22,9 @@ from openmm.app import PDBFile
 try:
 	with warnings.catch_warnings():
 		warnings.simplefilter("ignore")
-		import modeller
-		import modeller.automodel as automodel\
+		import modeller as modeller
+		import modeller.automodel as automodel
+
 except:
 	modeller = ImportError
 	automodel = ImportError
