@@ -10,7 +10,7 @@ import os
 import re
 import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import extract_features, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from helper_scripts.Ape_gen_macros import extract_anchors, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
 
 from subprocess import call
 
@@ -69,22 +69,7 @@ class Peptide(object):
 
 			if receptor_allotype in frequencies_alleles:
 				print("Receptor allotype has a known MHC binding motif!")
-				peptide_features = extract_features(peptide_sequence_noPTM, receptor_allotype, frequencies)
-				anchor_predictors = pkl.load(open("./helper_files/anchor_predictors.pkl", "rb"))
-
-				ranges = list(range(len(anchor_predictors[0])))
-				# Routine that does not take into account the random forests that used the datapoint as training data
-				if cv != '':
-					key = receptor_allotype + '-' + peptide_sequence
-					for i in range(len(anchor_predictors[1])):
-						if key in list(anchor_predictors[1][i]):
-							ranges.remove(i)	
-				predictions = np.zeros(sequence_length)
-				for i in ranges:
-					predictions += anchor_predictors[0][i].predict(np.vstack(peptide_features))
-				predictions /= len(ranges)
-				anchors = list(np.argwhere(predictions >= 0.5).flatten() + 1)
-				anchors = ",".join(map(str, anchors))
+				anchors = extract_anchors(peptide_sequence_noPTM, receptor_allotype, frequencies)
 			else:
 				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
 				anchors = "2,9"
@@ -120,6 +105,8 @@ class Peptide(object):
 		# 4) If there are duplicate results, select the one closer to the whole sequence
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
+		aligner.open_gap_score = -0.5
+		aligner.extend_gap_score = -0.1
 		for template_sequence in template_sequences:
 			score_list.append(aligner.score(peptide_sequence_noPTM, template_sequence))
 		templates['peptide_score'] = score_list
