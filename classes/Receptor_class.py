@@ -240,7 +240,7 @@ class Receptor(object):
 			return(cls(allotype = allotype, pdb_filename = './new_templates/' + pdb_filename))
 		
 		# Check #2: Existing sequence
-		print("Allotype not found in our structural DB. Let's see if it's in our sequence DB...")
+		if verbose(): print("Allotype not found in our structural DB. Let's see if it's in our sequence DB...")
 		for seq_record in SeqIO.parse("./helper_files/MHC_data.fasta", "fasta"):
 			if seq_record.id == allotype:
 				if verbose(): print("Allotype found in our sequence DB! Modelling it through homology modelling:")
