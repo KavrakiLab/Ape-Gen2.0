@@ -19,17 +19,6 @@ from nltk import ngrams
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
 
-<<<<<<< HEAD
-=======
-# MODELLER
-try:
-	from modeller import *
-	from modeller.automodel import *
-except:
-	print("Error with importing Modeller: Make sure license key is correct.")
-	sys.exit(0)
-
->>>>>>> main
 ## MACROS
 
 # set verbose

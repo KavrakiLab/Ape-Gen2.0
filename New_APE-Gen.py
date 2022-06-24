@@ -87,7 +87,6 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
 
 	# 2. Run Receptor through PDBFixer, as the non-polar hydrogens could be in wrong places (they do not participate in the SMINA Minimization process):
 	receptor = Receptor.frompdb(filestore + '/4_SMINA_data/minimized_receptors/receptor_' + str(conf_index) + ".pdb")
-	# receptor.add_sidechains(filestore)
 	add_sidechains(receptor.pdb_filename, filestore, add_hydrogens=True)
 
 	# 3. Unify peptide and receptor together and create a new pMHC complex
@@ -235,9 +234,9 @@ def apegen(args):
 		print("    Peptide Sequence: " + peptide.sequence)
 		print("    Peptide Template: " + peptide_template.pdb_filename)
 		print("    Peptide Anchors:")
-		print("   ", peptide.anchors)
+		print("       ", peptide.anchors)
 		print("    Peptide PTMs:")
-		print("   ", PTM_list)
+		print("       ", PTM_list)
 
 
 	# Check if:
@@ -274,7 +273,7 @@ def apegen(args):
 		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/4_SMINA_data')
 		receptor = receptor_template.receptor
-		receptor.add_sidechains(filestore)
+		add_sidechains(receptor.pdb_filename, filestore, add_hydrogens=True)
 		receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
