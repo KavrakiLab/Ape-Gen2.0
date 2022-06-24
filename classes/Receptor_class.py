@@ -8,7 +8,7 @@ from subprocess import call
 import sys
 import time
 import re
-import warnings
+import os
 
 from Bio import Align
 from Bio import SeqIO
@@ -16,18 +16,15 @@ from Bio import pairwise2
 
 # MODELLER
 try:
-	with warnings.catch_warnings():
-		warnings.simplefilter("ignore")
-		import modeller as modeller
-		import modeller.automodel as automodel
-
+	from modeller import *
+	from modeller.automodel import *
+	modeller_import = None
 except:
-	modeller = ImportError
-	automodel = ImportError
+	modeller_import = ImportError
 
 def model_single_opt(filestore, num_models=10):
 	# if the modeller import was unsuccessful, quit
-	if (modeller == ImportError or automodel == ImportError):
+	if (modeller_import == ImportError):
 		print("Error with importing Modeller: Make sure license key is correct.")
 		sys.exit(0)
 
@@ -92,7 +89,7 @@ def align_2d(filestore):
 
 def model_receptor(allele_sequence, peptide_sequence, filestore):
 	# if the modeller import was unsuccessful, quit
-	if (modeller == ImportError or automodel == ImportError):
+	if (modeller_import == ImportError):
 		print("Error with importing Modeller: Make sure license key is correct.")
 		sys.exit(0)
 
