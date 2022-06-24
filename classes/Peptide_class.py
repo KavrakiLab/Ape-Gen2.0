@@ -45,12 +45,12 @@ class Peptide(object):
 		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
 
 	@classmethod
-	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, cv=''):
+	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, anchor_selection, cv=''):
 
 		# Current policy of selecting/chosing peptide templates is:
 		peptide_sequence_noPTM = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 		sequence_length = len(re.sub('[a-z]', '', peptide_sequence_noPTM)) 
-		templates = pd.read_csv("./helper_files/Template_Information_notation.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Updated_template_information.csv") # Fetch template info
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
@@ -91,8 +91,11 @@ class Peptide(object):
 
 		print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, peptide_sequence_noPTM)
-		templates['anchor_not'] = templates['anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
-		templates['jaccard_distance'] = templates['anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
+		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
+		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
+		
+		# Choosing the major anchors as template choosing mechanis (secondary anchors are way to complicated)
+		templates['jaccard_distance'] = templates['Major_anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
 		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
@@ -126,21 +129,22 @@ class Peptide(object):
 		final_selection = templates.sample(n=1)
 		peptide_template = final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
-		template_anchors_not = final_selection['anchor_not'].values[0] 
-		
-		# 6) Before the end, it is a good idea here to match the predicted/set anchors of the peptide
-		# with the anchors of the template for the anchor tolerance step. General workflow is:
-		# A) Take intersection of anchor notation (this will force equal number of anchors)
-		# B) Sort
-		# C) Extract the numbers using the peptide lengths
-		anchor_union = list(anchors_not.intersection(template_anchors_not))
-		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in anchor_union])
-		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchor_union])
 
+		# 6) Take anchor positions for anchor tolerance based on user selection
+		if anchor_selection == 'primary':
+			template_anchors_not = final_selection['Major_anchor_not'].values[0]
+		elif anchor_selection == 'secondary':
+			template_anchors_not = final_selection['Secondary_anchor_not'].values[0]
+		else:
+			template_anchors_not = {}
+		
+		# 7) Extract the anchor position numbers for the anchor tolerance step!
+		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
+		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(template_anchors_not)])
+		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(template_anchors_not)])
 		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
 				   sequence = peptide_sequence, 
 				   anchors = peptide_anchors), template_anchors
-
 
 	def perform_PTM(self, filestore, peptide_index, PTM_list):
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
@@ -326,8 +330,8 @@ class Peptide(object):
 			#input()
 			if matching.shape[0] == 0: # Empty Solution
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
-				os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb")
-				with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'a+') as flexible_log:
+				# os.remove(filestore + "/flexible_receptors/receptor_" + str(peptide_index) + ".pdb") ## DON'T DELETE FOR KNOW, IN CASE WE HAVE THIS ISSUE AGAIN, INSPECT THE OUTPUT
+				with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as flexible_log:
 					flexible_log.write(str(current_round) + "," + str(peptide_index) + ",Flexible receptor conformation received was faulty,-\n") 
 				return True
 

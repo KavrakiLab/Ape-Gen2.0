@@ -211,6 +211,9 @@ def apegen(args):
 	# --force_restart: Force restart of APE-Gen *ONLY* in the first round and *ONLY* if no conformations are produced
 	force_restart = args.force_restart
 
+	# --anchor_selection: Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)
+	anchor_selection = args.anchor_selection
+
 	# Directory to store intermediate files
 	temp_files_storage = args.dir
 	initialize_dir(temp_files_storage)
@@ -256,7 +259,7 @@ def apegen(args):
 	else:
 		# Fetch template from peptide template list
 		# peptide = Peptide.fromsequence(peptide_input)
-		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
+		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors, anchor_selection)
 
 	# Peptide Template is also a pMHC complex though    
 	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
