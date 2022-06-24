@@ -1,4 +1,5 @@
 import os
+from sys import stdout
 import shutil
 import sys
 import re
@@ -18,6 +19,17 @@ from nltk import ngrams
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
 
+<<<<<<< HEAD
+=======
+# MODELLER
+try:
+	from modeller import *
+	from modeller.automodel import *
+except:
+	print("Error with importing Modeller: Make sure license key is correct.")
+	sys.exit(0)
+
+>>>>>>> main
 ## MACROS
 
 # set verbose
@@ -31,9 +43,9 @@ def set_verbose(val):
 
 # Three-to-one (and vice versa) AA transformation
 standard_three_to_one_letter_code = {'ARG':'R', 'HIS':'H', 'LYS':'K', 'ASP':'D', 'GLU':'E', \
-						  			 'SER':'S', 'THR':'T', 'ASN':'N', 'GLN':'Q', 'CYS':'C', \
-						  			 'GLY':'G', 'PRO':'P', 'ALA':'A', 'VAL':'V', 'ILE':'I', \
-						  			 'LEU':'L', 'MET':'M', 'PHE':'F', 'TYR':'Y', 'TRP':'W'}
+									 'SER':'S', 'THR':'T', 'ASN':'N', 'GLN':'Q', 'CYS':'C', \
+									 'GLY':'G', 'PRO':'P', 'ALA':'A', 'VAL':'V', 'ILE':'I', \
+									 'LEU':'L', 'MET':'M', 'PHE':'F', 'TYR':'Y', 'TRP':'W'}
 standard_one_to_three_letter_code = {value: key for key, value in standard_three_to_one_letter_code.items()}
 
 
@@ -128,7 +140,6 @@ def add_sidechains(pdb_filename, filestore, peptide_idx=-1, remove_heterogens=Tr
 		copy_file(filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb', 
 							filestore + '/PTMed_peptides/PTMed_' + str(peptide_idx) + '.pdb')
 	return pdb_filename
-
 
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
@@ -255,7 +266,7 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 				 'PRO':[["CA", "C", "CB", "CG", "CD"]],
 				 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"]],
 				 'HIS':[["CA", "C", "CB", "CG", "ND1", "HD1", "CE1", "NE2", "CD2"], 
-				 		["CA", "C", "CB", "CG", "ND1", "HE2", "CE1", "NE2", "CD2"]],
+						["CA", "C", "CB", "CG", "ND1", "HE2", "CE1", "NE2", "CD2"]],
 				 'LYS':[["CA", "C", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2", "HZ3"]],
 				 'ASP':[["CA", "C", "CB", "CG", "OD1", "OD2"]],
 				 'GLU':[["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]]
@@ -278,7 +289,7 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 					   'PRO':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]]],
 					   'ARG':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "HE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"], ["NH1", "HH11"], ["NH1", "HH12"], ["NH2", "HH21"], ["NH2", "HH22"]]],
 					   'HIS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["ND1", "HD1"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]],
-					   		  [["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["NE2", "HE2"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]]],
+							  [["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["NE2", "HE2"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]]],
 					   'LYS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "CE"], ["CE", "NZ"], ["NZ", "HZ1"], ["NZ", "HZ2"], ["NZ", "HZ3"]]],
 					   'ASP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "OD1"], ["CG", "OD2"]]],
 					   'GLU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "OE2"]]]

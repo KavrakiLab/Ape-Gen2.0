@@ -20,10 +20,6 @@ from openmm import *
 from openmm.unit import *
 from sys import stdout
 
-# PDBFIXER
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
-
 class pMHC(object):
 
 	def __init__(self, pdb_filename, peptide = None, receptor = None):
@@ -33,7 +29,7 @@ class pMHC(object):
 		self.anchor_xyz = None
 
 	def align(self, reference, filestore):
-		initialize_dir(filestore + '/alignment_files')
+		initialize_dir(filestore + '/1_alignment_files')
 		#pymol.pymol_argv = ['pymol','-c']
 		#pymol.finish_launching()
 		p1 = pymol2.PyMOL()
@@ -43,28 +39,21 @@ class pMHC(object):
 
 		p1.cmd.align("mobile & chain A", "ref & chain A")
 
-		self.pdb_filename = filestore + '/alignment_files/receptor.pdb'
+		self.pdb_filename = filestore + '/1_alignment_files/receptor.pdb'
 		p1.cmd.save(self.pdb_filename, "mobile")
-		p1.cmd.save(filestore + '/alignment_files/peptide.pdb', "ref")
+		p1.cmd.save(filestore + '/1_alignment_files/peptide.pdb', "ref")
 
 		# Also store receptor without peptide and keep that on the receptor part
 		# CAUTION: If receptor template is a result of homology modelling, the peptide is ignored there, so
 		# the receptor will already be without a peptide to begin with. This does not affect this step at all
 		# however
 		p1.cmd.create("mobile_sans_peptide", "mobile & chain A")
-		self.receptor.pdb_filename = filestore + '/alignment_files/receptor_sans_peptide.pdb'
+		self.receptor.pdb_filename = filestore + '/1_alignment_files/receptor_sans_peptide.pdb'
 		p1.cmd.save(self.receptor.pdb_filename, "mobile_sans_peptide")
 
 		#pymol.cmd.quit()
 		p1.stop()
 
-	def add_sidechains(self, filestore):
-		fixer = PDBFixer(filename=self.pdb_filename)
-		fixer.findMissingResidues()
-		fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-		fixer.findMissingAtoms()
-		fixer.addMissingAtoms()
-		PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'), keepIds=True)
 
 	def prepare_for_RCD(self, reference, filestore):
 
@@ -274,8 +263,8 @@ class pMHC(object):
 		# Minimize energy
 		simulation.minimizeEnergy()
 		simulation.reporters.append(app.StateDataReporter(stdout, 100, step=True, potentialEnergy=True, 
-    								temperature=True, progress=False, remainingTime=True, speed=True, 
-    								totalSteps=250000, separator='\t'))
+									temperature=True, progress=False, remainingTime=True, speed=True, 
+									totalSteps=250000, separator='\t'))
 
 		# Write results to a new file if energy is small enough
 		energy = simulation.context.getState(getEnergy=True).getPotentialEnergy() / kilojoule_per_mole
@@ -284,5 +273,5 @@ class pMHC(object):
 			path, file = os.path.split(self.pdb_filename)
 			r = PDBReporter(filestore + '/5_openMM_conformations/minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
-   			
+			
 		return best_energy 
