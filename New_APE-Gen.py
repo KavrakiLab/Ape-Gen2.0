@@ -87,7 +87,8 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
 
 	# 2. Run Receptor through PDBFixer, as the non-polar hydrogens could be in wrong places (they do not participate in the SMINA Minimization process):
 	receptor = Receptor.frompdb(filestore + '/4_SMINA_data/minimized_receptors/receptor_' + str(conf_index) + ".pdb")
-	receptor.add_sidechains(filestore)
+	# receptor.add_sidechains(filestore)
+	add_sidechains(receptor.pdb_filename, filestore, add_hydrogens=True)
 
 	# 3. Unify peptide and receptor together and create a new pMHC complex
 	pMHC_conformation = filestore + "/5_openMM_conformations/pMHC_before_sim/pMHC_" + str(conf_index) + ".pdb"
@@ -228,15 +229,15 @@ def apegen(args):
 
 	if verbose:
 		print("Receptor Successfully Processed")
-		print("Receptor Allotype: " + receptor.allotype)
-		print("Receptor Template: " + receptor_template.pdb_filename)
+		print("    Receptor Allotype: " + receptor.allotype)
+		print("    Receptor Template: " + receptor_template.pdb_filename)
 		print("Peptide Successfully Processed")
-		print("Peptide Sequence: " + peptide.sequence)
-		print("Peptide Template: " + peptide_template.pdb_filename)
-		print("Peptide Anchors:")
-		print(peptide.anchors)
-		print("Peptide PTMs:")
-		print(PTM_list)
+		print("    Peptide Sequence: " + peptide.sequence)
+		print("    Peptide Template: " + peptide_template.pdb_filename)
+		print("    Peptide Anchors:")
+		print("   ", peptide.anchors)
+		print("    Peptide PTMs:")
+		print("   ", PTM_list)
 
 
 	# Check if:

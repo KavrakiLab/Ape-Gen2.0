@@ -18,10 +18,6 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, e
 											standard_three_to_one_letter_code, anchor_dictionary,  \
 											verbose
 
-# PDBFIXER
-from pdbfixer import PDBFixer
-from openmm.app import PDBFile
-
 from subprocess import call
 
 from pdbtools import pdb_tofasta, pdb_delelem
@@ -273,11 +269,11 @@ class Peptide(object):
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
 	def score_with_SMINA(self, filestore, receptor, peptide_index):
-		self.pdb_filename = filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb"	
+		self.pdb_filename = filestore + "/Scoring_results/model_" + str(peptide_index) + ".pdb" 
 		call(["smina -q --score_only --ligand " + self.pdbqt_filename + \
 			  " --receptor " + receptor.pdbqt_filename + " --out " + self.pdb_filename + \
 			  " > " + filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
-		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(peptide_index) + ".pdb")	
+		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(peptide_index) + ".pdb")    
 
 	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, index, current_round):
 
@@ -329,11 +325,11 @@ class Peptide(object):
 	def fix_flexible_residues(self, filestore, receptor, current_round):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
-		#minimized_receptor_loc = filestore + "/SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
+		#minimized_receptor_loc = filestore + "/4_SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
 		#if receptor.doMinimization:
 		#	call(["python ./helper_scripts/makeflex.py " + \
-		#		  filestore + "/SMINA_data/receptor_for_smina.pdb " + \
-		#		  filestore + "/SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
+		#		  filestore + "/4_SMINA_data/receptor_for_smina.pdb " + \
+		#		  filestore + "/4_SMINA_data/flexible_receptors/receptor_" + str(peptide_index) + ".pdb " + \
 		#		  minimized_receptor_loc],
 		#		  stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'), shell=True)
 
@@ -385,7 +381,7 @@ class Peptide(object):
 				return True
 
 			sub_pdb = sub_pdb.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
-			list_of_dataframes.append(sub_pdb)	
+			list_of_dataframes.append(sub_pdb)  
 
 		# When done, bring the .pdb file columns to the appropriate order
 		renamed_atoms = pd.concat(list_of_dataframes)
