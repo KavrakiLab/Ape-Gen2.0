@@ -186,7 +186,7 @@ class Receptor(object):
 		peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
+		templates = pd.read_csv("./helper_files/Updated_template_information.csv")
 		if(allotype in templates['MHC'].tolist()):
 
 			print("Allotype found in our structural DB!")
@@ -195,6 +195,8 @@ class Receptor(object):
 			print("Will try to get the one that is closer to the peptide_input:")
 			# select the one closer to the whole sequence
 			aligner = Align.PairwiseAligner()
+			aligner.open_gap_score = -0.5
+			aligner.extend_gap_score = -0.1
 			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
 			score_list = []
 			template_sequences = templates['peptide'].tolist()

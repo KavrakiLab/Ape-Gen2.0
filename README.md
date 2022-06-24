@@ -80,7 +80,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 
 #### Major issues:
 - `5TRZ.pdb` is the only peptide with non-canonical anchors in both positions. For those cases, bring 2 peptide templates, one for each position and combine them. 
-- Change anchor prediction step based on the analysis done with the crude 3D rectangle boundaries
 - Prepare the code for RMSD comparison with PANDORA paper.
 - When forcing restart, also increase the anchor tolerance step by 1A each time to make it easier for the algorithm? (With a threshold also that stops the workflow altogether)
 - Adjust RCD for cases where anchor position is shifted on the inside of the peptide.

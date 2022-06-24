@@ -119,9 +119,9 @@ def copy_batch_of_files(src, dst, query):
 		if (query in f): shutil.copy(src + f, dst)
 
 def add_sidechains(pdb_filename, filestore, peptide_idx=-1, remove_heterogens=True,   \
-																add_hydrogens=False,    \
-																add_solvent=False,      \
-																keep_IDs=False          ):
+																add_hydrogens=False,	\
+																add_solvent=False,	  \
+																keep_IDs=False		  ):
 	fixer = PDBFixer(filename=pdb_filename)
 	fixer.findMissingResidues()
 	if remove_heterogens: fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
@@ -513,3 +513,53 @@ def extract_features(peptide, MHC, frequencies):
 	X = np.array(np.array(sub_seq_feature_list, dtype=np.float), dtype=object)
 
 	return X
+
+def extract_anchors(peptide, MHC, frequencies):
+
+	# Preprocessing for feature extration
+	frequencies = frequencies[frequencies['length'].isin([8,9,10,11])]
+	frequencies_first_part = frequencies[frequencies['position'].isin([1,2,3])]
+	frequencies_second_part = frequencies[frequencies['length'] - frequencies['position'] <= 2].copy()
+	frequencies_second_part['position'] = frequencies_second_part['position'].sub(frequencies_second_part['length'], axis = 0)
+	frequencies_first_part = frequencies_first_part.groupby(['allele', 'position']).max().reset_index().drop(['length', 'cutoff_fraction', 'cutoff_count'], axis=1)
+	frequencies_second_part = frequencies_second_part.groupby(['allele', 'position']).max().reset_index().drop(['length', 'cutoff_fraction', 'cutoff_count'], axis=1)
+
+	# Feature for pos 3 only
+	aa_volume = {'G': 60.1, 'A': 88.6, 'S': 89.0, 'C': 108.5, 'D' : 111.1, 'P' : 112.7, 'N': 114.1, 'T': 116.1,
+				 'E': 138.4, 'V': 140.0, 'Q': 143.8, 'H': 153.2, 'M': 162.9, 'I': 166.7, 'L': 116.7, 'K': 168.6,
+				 'R': 173.4, 'F': 189.9, 'Y': 193.6, 'W': 227.8}
+
+	first_part_of_peptide = peptide[:3]
+	pep_sequence = list(first_part_of_peptide)
+	freq_features = frequencies_first_part[(frequencies_first_part['allele'] == MHC)]
+	potential_pos_1 = freq_features[freq_features['position'] == 2][pep_sequence[0]].values[0]
+	potential_pos_3 = freq_features[freq_features['position'] == 2][pep_sequence[2]].values[0]
+	stability_pos_2 = freq_features[freq_features['position'] == 2][pep_sequence[1]].values[0]
+	inertia_pos_1 = freq_features[freq_features['position'] == 1][pep_sequence[0]].values[0]
+	inertia_pos_3 = freq_features[freq_features['position'] == 3][pep_sequence[0]].values[0]
+	volume_pos_3 = aa_volume[pep_sequence[0]] + aa_volume[pep_sequence[1]]
+
+	second_part_of_peptide = peptide[-3:]
+	pep_sequence = list(second_part_of_peptide)
+	freq_features = frequencies_second_part[(frequencies_second_part['allele'] == MHC)]
+	potential_pos_C2 = freq_features[freq_features['position'] == 0][pep_sequence[0]].values[0]
+	potential_pos_C1 = freq_features[freq_features['position'] == 0][pep_sequence[1]].values[0]
+	stability_pos_C = freq_features[freq_features['position'] == 0][pep_sequence[2]].values[0]
+	inertia_pos_C2 = freq_features[freq_features['position'] == -2][pep_sequence[0]].values[0]
+	inertia_pos_C1 = freq_features[freq_features['position'] == -1][pep_sequence[1]].values[0]
+
+	# N-termini
+	anchor_1 = "2"
+	if (potential_pos_3 > 0.195) and (volume_pos_3 < 180) and (stability_pos_2 < 0.1):
+		anchor_1 = "3"
+	if (potential_pos_1 > 0.195) and (inertia_pos_1 < 0.14) and (stability_pos_2 < 0.08):
+		anchor_1 = "1"
+
+	# C-termini
+	anchor_2 = str(len(peptide))
+	if (potential_pos_C1 > 0.16) and (inertia_pos_1 < 0.14) and (stability_pos_2 < 0.08):
+		anchor_2 = str(len(peptide) - 1) 
+	if (potential_pos_C2 > 0.25) and (stability_pos_C < 0.02):
+		anchor_2 = str(len(peptide) - 2) 
+
+	return ",".join([anchor_1, anchor_2])
