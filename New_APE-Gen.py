@@ -18,7 +18,7 @@ from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
 
-def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, anchors):
+def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors):
 
 	new_filestore = filestore + '/5_openMM_conformations'
 
@@ -53,7 +53,7 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 		peptide_handler.write(overwritten)
 	peptide_handler.close()
 	
-	peptide = Peptide.frompdb(peptide_file, anchors = anchors)
+	peptide = Peptide.frompdb(peptide_file, secondary_anchors = tolerance_anchors)
 	peptide.sequence = re.sub('[a-z]', '', peptide.sequence) # Remove PTMs from the sequence
 
 	# 4. Re-score with SMINA (enforce no further minimization)
@@ -110,7 +110,7 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list):
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, anchors, 
+def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor, tolerance_anchors, 
 								   peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
@@ -122,7 +122,7 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	Cterm_location = filestore + '/2_input_to_RCD/C_ter.pdb'
 	assembled_peptide = new_filestore + '/assembled_peptides/assembled_' + str(peptide_index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
-	peptide = Peptide.frompdb(assembled_peptide, anchors = anchors)
+	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors = tolerance_anchors)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=peptide_index, add_hydrogens=True)
@@ -258,17 +258,11 @@ def apegen(args):
 		peptide = Peptide.frompdb(peptide_input, anchors = "") 
 	else:
 		# Fetch template from peptide template list
-		# peptide = Peptide.fromsequence(peptide_input)
-		peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors, anchor_selection)
-
-	# Peptide Template is also a pMHC complex though    
-	peptide_template = pMHC(pdb_filename = peptide.pdb_filename, peptide = peptide) 
+		peptide, peptide_template = Peptide.fromsequence(peptide_input, receptor.allotype, anchors, anchor_selection)
 
 	# Get peptide template anchor positions for anchor tolerance filtering
 	if debug: print("Extract peptide template anchors for anchor tolerance filtering")
-	peptide_template_anchors_xyz = peptide_template.set_anchor_xyz(reference = peptide_template, 
-																   pep_seq = peptide.sequence,
-																   anchors = template_anchors)
+	peptide_template_anchors_xyz, tolerance_anchors = peptide_template.set_anchor_xyz(anchor_selection, peptide)
 
 	# The reason that we calculate the PTMs list here and not in the Peptide class is because we need it to be a
 	# global variable to pass it on all peptide instances that need to be PTMed
@@ -280,7 +274,9 @@ def apegen(args):
 		print("Peptide Sequence: " + peptide.sequence)
 		print("Peptide Template: " + peptide_template.pdb_filename)
 		print("Peptide Anchors:")
-		print(peptide.anchors)
+		print(peptide.primary_anchors)
+		print("Peptide Secondary Anchors suggested by the template:")
+		print(peptide.secondary_anchors)
 		print("Peptide PTMs:")
 		print(PTM_list)
 
@@ -307,7 +303,7 @@ def apegen(args):
 		if debug: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference = peptide_template, filestore = filestore)
 		if debug: print("Preparing input to RCD")
-		receptor_template.prepare_for_RCD(reference = peptide_template, filestore = filestore, pep_seq = peptide.sequence)
+		receptor_template.prepare_for_RCD(reference = peptide_template, peptide = peptide, filestore = filestore)
 		add_sidechains(receptor_template.pdb_filename, filestore, keep_IDs=True)
 
 		# Perform RCD on the receptor given peptide:
@@ -318,7 +314,6 @@ def apegen(args):
 		if debug: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/4_SMINA_data')
 		receptor = receptor_template.receptor
-		# receptor.add_sidechains(filestore)
 		add_sidechains(receptor.pdb_filename, filestore, add_hydrogens=True)
 		receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
 
@@ -336,7 +331,7 @@ def apegen(args):
 		initialize_dir(filestore + '/4_SMINA_data/Anchor_filtering')
 		initialize_dir(filestore + '/4_SMINA_data/pMHC_complexes/')
 
-		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, peptide.anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
+		arg_list = list(map(lambda e: (e, filestore, PTM_list, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						range(1, num_loops + 1)))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
@@ -406,7 +401,7 @@ def apegen(args):
 
 			# Rescoring and re-filtering resulting conformations
 			if debug: print("\nRescoring and re-filtering resulting conformations:")
-			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, peptide.anchors), successful_confs))
+			arg_list = list(map(lambda e: (e, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=True)
 

@@ -11,6 +11,7 @@ import re
 import pickle as pkl
 
 from helper_scripts.Ape_gen_macros import extract_anchors, rev_anchor_dictionary, all_three_to_one_letter_codes, move_file, copy_file, merge_and_tidy_pdb, replace_chains, remove_remarks_and_others_from_pdb, delete_elements, extract_CONECT_from_pdb, csp_solver, process_anchors, jaccard_distance
+from classes.pMHC_class import pMHC
 
 from subprocess import call
 
@@ -20,14 +21,15 @@ from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
 
 class Peptide(object):
 
-	def __init__(self, pdb_filename, sequence, anchors):
+	def __init__(self, pdb_filename, sequence, primary_anchors=None, secondary_anchors=None):
 		self.sequence = sequence
 		self.pdb_filename = pdb_filename
 		self.pdbqt_filename = None
-		self.anchors = anchors
+		self.primary_anchors = primary_anchors
+		self.secondary_anchors = secondary_anchors
 
 	@classmethod
-	def frompdb(cls, pdb_filename, anchors):
+	def frompdb(cls, pdb_filename, primary_anchors=None, secondary_anchors=None):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -42,7 +44,8 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, anchors = anchors)
+		return cls(pdb_filename = pdb_filename, sequence = peptide_sequence, 
+				   primary_anchors = primary_anchors, secondary_anchors = secondary_anchors)
 
 	@classmethod
 	def fromsequence(cls, peptide_sequence, receptor_allotype, anchors, anchor_selection, cv=''):
@@ -79,7 +82,7 @@ class Peptide(object):
 		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		
-		# Choosing the major anchors as template choosing mechanis (secondary anchors are way to complicated)
+		# Choosing the major anchors as template choosing mechanism (secondary anchors are way to complicated)
 		templates['jaccard_distance'] = templates['Major_anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
 		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
 
@@ -114,24 +117,25 @@ class Peptide(object):
 
 		# 5) If there are duplicate results, select at random!
 		final_selection = templates.sample(n=1)
-		peptide_template = final_selection['pdb_code'].values[0]
+		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
-		# 6) Take anchor positions for anchor tolerance based on user selection
-		if anchor_selection == 'primary':
-			template_anchors_not = final_selection['Major_anchor_not'].values[0]
-		elif anchor_selection == 'secondary':
-			template_anchors_not = final_selection['Secondary_anchor_not'].values[0]
-		else:
-			template_anchors_not = {}
-		
-		# 7) Extract the anchor position numbers for the anchor tolerance step!
+		# 6) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
-		template_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(template_anchors_not)])
-		peptide_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(template_anchors_not)])
-		return cls(pdb_filename = ('./new_templates/' + peptide_template), 
-				   sequence = peptide_sequence, 
-				   anchors = peptide_anchors), template_anchors
+		template_major_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Major_anchor_not'].values[0])])
+		template_secondary_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
+		peptide_primary_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchors_not])
+		peptide_second_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
+
+		# 7) Define the peptide template object
+		peptide_template = pMHC(pdb_filename = peptide_template_file, 
+								peptide = Peptide.frompdb(pdb_filename = peptide_template_file, 
+														  primary_anchors = template_major_anchors,
+														  secondary_anchors = template_secondary_anchors))
+
+		# 8) Return both the peptide object, as well as the peptide template that was chosen
+		return cls(pdb_filename = None, sequence = peptide_sequence, 
+				   primary_anchors = peptide_primary_anchors, secondary_anchors = peptide_second_anchors), peptide_template
 
 	def perform_PTM(self, filestore, peptide_index, PTM_list):
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
@@ -224,11 +228,10 @@ class Peptide(object):
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 
 		# Only anchors
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.anchors)]
-		
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.secondary_anchors)]
 		# Only carbon-alpha atoms
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'] == 'CA']
-		
+
 		# Only positions
 		pdb_peptide_anchors_xyz = pdb_df_peptide[['x_coord', 'y_coord', 'z_coord']].to_numpy()
 
@@ -257,7 +260,7 @@ class Peptide(object):
 				anchor_log.write(str(current_round) + "," + str(peptide_index) + "," + ','.join(map(str, anchor_difference))) 
 			
 			# Keep this result for final printing
-			faulty_positions = (anchor_difference > anchor_tol)*self.anchors
+			faulty_positions = (anchor_difference > anchor_tol)*self.secondary_anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
 			with open(filestore + "/per_peptide_results/peptide_" + str(peptide_index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(peptide_index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
