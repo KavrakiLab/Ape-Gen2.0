@@ -336,14 +336,6 @@ def apegen(args):
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=True)
 
-
-		# Working Code for enbsembling individual .pdbs (might come in handy later!)
-
-		# list_of_RCD_files = glob.glob(filestore + '/4_SMINA_data/PTMed_peptides/*.pdb')
-		# ensembled = pdb_mkensemble.run(list_of_RCD_files)
-		# with open(filestore + '/4_SMINA_data/PTMed_peptides/ensemble.pdb', 'w') as anchored_MHC_file:
-		#	anchored_MHC_file.write(''.join(ensembled))
-
 		# Code for non-parallel execution and debugging
 
 		#for argument in arg_list:
@@ -430,7 +422,11 @@ def apegen(args):
 			if not force_restart:
 				print('No conformations were produced... Aborting...')
 				sys.exit(0)
-			print('No conformations were produced... Force restarting...')
+			anchor_tol += 1
+			if anchor_tol > 10:
+				print('No conformations were produced... Tolerance is quite high so something else is wrong... Aborting...')
+				sys.exit(0)
+			print('No conformations were produced... Force restarting with increased anchor tolerance = ' + str(anchor_tol))
 		else:
 			# Storing the best conformation
 			best_energy = results_csv['Affinity'].astype('float').min()
