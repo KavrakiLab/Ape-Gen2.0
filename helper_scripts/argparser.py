@@ -22,4 +22,5 @@ def APE_Gen_parser():
 	parser.add_argument("--dir", type=str, default='intermediate_files', help='Location for all the intermediate files')
 	parser.add_argument("--force_restart", action="store_true", help='Force restart of APE-Gen *ONLY* in the first round and *ONLY* if no conformations are produced')
 	parser.add_argument("--anchor_selection", type=str, default='secondary', choices=['primary', 'secondary', 'none'], help="Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)")
+	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
 	return parser

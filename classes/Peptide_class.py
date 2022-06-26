@@ -109,7 +109,7 @@ class Peptide(object):
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
 		aligner.open_gap_score = -0.5
-		aligner.extend_gap_score = -0.1
+		aligner.extend_gap_score = -0.5
 		for template_sequence in template_sequences:
 			score_list.append(aligner.score(peptide_sequence_noPTM, template_sequence))
 		templates['peptide_score'] = score_list
