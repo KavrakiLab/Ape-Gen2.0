@@ -349,7 +349,7 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 				 'THR':[["CA", "C", "CB", "OG1", "HG1", "CG2"]],
 				 'ASN':[["CA", "C", "CB", "CG", "OD1", "ND2", "HD21", "HD22"]],
 				 'GLN':[["CA", "C", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"]],
-				 'CYS':[["CA", "C", "CB", "SG", "HG1"]],
+				 'CYS':[["CA", "C", "CB", "SG"]],
 				 'GLY':[["CA", "C"]],
 				 'PRO':[["CA", "C", "CB", "CG", "CD"]],
 				 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"]],
@@ -372,7 +372,7 @@ def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
 					   'THR':[[["CA", "C"], ["CA", "CB"], ["CB", "OG1"], ["OG1", "HG1"], ["CB", "CG2"]]],
 					   'ASN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND2"], ["ND2", "HD21"], ["ND2", "HD22"]]],
 					   'GLN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "NE2"], ["NE2", "HE21"], ["NE2", "HE22"]]],
-					   'CYS':[[["CA", "C"], ["CA", "CB"], ["CB", "SG"], ["SG", "HG1"]]],
+					   'CYS':[[["CA", "C"], ["CA", "CB"], ["CB", "SG"]]],
 					   'GLY':[[["CA", "C"]]],
 					   'PRO':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]]],
 					   'ARG':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "HE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"], ["NH1", "HH11"], ["NH1", "HH12"], ["NH2", "HH21"], ["NH2", "HH22"]]],
@@ -557,7 +557,7 @@ def extract_anchors(peptide, MHC, frequencies):
 
 	# C-termini
 	anchor_2 = str(len(peptide))
-	if (potential_pos_C1 > 0.16) and (inertia_pos_1 < 0.14) and (stability_pos_2 < 0.08):
+	if (potential_pos_C1 > 0.16) and (inertia_pos_C1 < 0.14) and (stability_pos_C < 0.08):
 		anchor_2 = str(len(peptide) - 1) 
 	if (potential_pos_C2 > 0.25) and (stability_pos_C < 0.02):
 		anchor_2 = str(len(peptide) - 2) 
