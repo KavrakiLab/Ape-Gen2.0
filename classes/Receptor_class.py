@@ -180,13 +180,16 @@ class Receptor(object):
 		return cls(allotype = "REDOCK", pdb_filename = peptide_input)
 
 	@classmethod
-	def fromallotype(cls, allotype, peptide_sequence, filestore):
+	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
 
 		# Pre-process: Remove any PTMs from the peptide sequence:
 		peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
 		templates = pd.read_csv("./helper_files/Updated_template_information.csv")
+
+		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
+
 		if(allotype in templates['MHC'].tolist()):
 
 			print("Allotype found in our structural DB!")

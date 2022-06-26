@@ -214,6 +214,10 @@ def apegen(args):
 	# --anchor_selection: Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)
 	anchor_selection = args.anchor_selection
 
+	# --cv: ONLY FOR TESTING (to be removed in the final version)
+	cv = args.cv
+
+
 	# Directory to store intermediate files
 	temp_files_storage = args.dir
 	initialize_dir(temp_files_storage)
@@ -238,7 +242,7 @@ def apegen(args):
 	else:
 		# If this is an allotype specification, fetch template like the peptide!
 		initialize_dir(temp_files_storage +  '/MODELLER_output')
-		receptor = Receptor.fromallotype(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output')
+		receptor = Receptor.fromallotype(receptor_class, peptide_input, temp_files_storage +  '/MODELLER_output', cv)
 		receptor_template_file = receptor.pdb_filename
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
@@ -258,7 +262,7 @@ def apegen(args):
 		peptide = Peptide.frompdb(peptide_input, anchors = "") 
 	else:
 		# Fetch template from peptide template list
-		peptide, peptide_template = Peptide.fromsequence(peptide_input, receptor.allotype, anchors, anchor_selection)
+		peptide, peptide_template = Peptide.fromsequence(peptide_input, receptor.allotype, anchors, anchor_selection, cv)
 
 	# Get peptide template anchor positions for anchor tolerance filtering
 	if debug: print("Extract peptide template anchors for anchor tolerance filtering")
