@@ -24,7 +24,6 @@ class pMHC(object):
 		self.pdb_filename = pdb_filename
 		self.peptide = peptide
 		self.receptor = receptor
-		self.anchor_xyz = None
 
 	def align(self, reference, filestore):
 		initialize_dir(filestore + '/1_alignment_files')
@@ -53,16 +52,16 @@ class pMHC(object):
 		p1.stop()
 
 
-	def prepare_for_RCD(self, reference, filestore, pep_seq):
+	def prepare_for_RCD(self, reference, peptide, filestore):
 
-		# Function that prepares files for performing RCD
-		# Namely, it extracts the peptide anchors from the peptime template
-		# It removes the peptide from the receptor template
-		# It unifies those results, making the receptor + anchors that we want to model using RCD
+		# Function that prepares files for performing RCD:
+		# 1. It removes the peptide from the receptor template
+		# 2. It extracts the peptide anchors from the peptime template
+		# 3. It replaces those anchors with the amino acids of the peptide that we want to model
 
 		initialize_dir(filestore + '/2_input_to_RCD')
 
-		# First, delete the peptide from the receptor template:
+		# 1. Delete the peptide from the receptor template:
 		ppdb_receptor = PandasPdb()
 		ppdb_receptor.read_pdb(self.pdb_filename)
 		pdb_df_receptor = ppdb_receptor.df['ATOM']
@@ -70,7 +69,7 @@ class pMHC(object):
 		self.pdb_filename = filestore + '/2_input_to_RCD/receptor.pdb'
 		ppdb_receptor.to_pdb(path=self.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
 
-		# Secondly, keep the anchors and the backbone from the peptide pdb
+		# 2. Secondly, keep the anchors and the backbone from the peptide pdb
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(reference.pdb_filename)
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
@@ -82,27 +81,27 @@ class pMHC(object):
 		# These are also the atoms that I am playing with in RCD (I don't need any others)
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'].isin(['N', 'CA', 'C', 'O', 'CB'])]
 
-		# It is important here to ensure that the peptide template length and the peptide tomodel length are equal
-		# If the length of the template is larger, we need to remove amino acids (removing the middle ones)
-		# If the length of the template is smaller, we need to add aminoacids
-
 		# Here, I am replacing the (anchor) residues of the template peptide with the residues of the given peptide.
 		# Note to self: I don't think I need to replace for the other residues, as this is something RCD takes care of
-		template_peptide_len = pdb_df_peptide['residue_number'].max()
-		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[0]]
-		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == 2, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[1]]
-		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len - 1, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[len(pep_seq) - 2]]
-		pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len, 'residue_name'] = all_one_to_three_letter_codes[pep_seq[len(pep_seq) - 1]]
+		anchor_1 = reference.peptide.primary_anchors[0]
+		anchor_2 = reference.peptide.primary_anchors[1]
+		template_peptide_len = len(reference.peptide.sequence)
+		for res in range(1, anchor_1 + 1):
+			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == res, 'residue_name'] = all_one_to_three_letter_codes[peptide.sequence[res - 1]]
+		
+		for res in range(anchor_2 - template_peptide_len - 1, 1):
+			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len + res, 'residue_name'] = all_one_to_three_letter_codes[peptide.sequence[len(peptide.sequence) + res - 1]]
 		
 		# Removing all middle amino-acids (they will be filled by RCD):
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin([1, 2, template_peptide_len - 1, template_peptide_len])]
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1 + 1)) + list(range(anchor_2 - 1, template_peptide_len + 1)))]
 
 		# But need to re-index those with the peptide length that I want to model in order for RCD to work:
 		# In order to not mess up re-indexing, I need to keep as a reference the atom indexes, which are unique
-		atom_indexes_c1 = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len - 1]['atom_number'].values
-		atom_indexes_c = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len]['atom_number'].values
-		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes_c1), 'residue_number'] = len(pep_seq) - 1
-		pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes_c), 'residue_number'] = len(pep_seq)
+		atom_indexes = {}
+		for res in range(anchor_2 - template_peptide_len - 1, 1):
+			atom_indexes[res] = pdb_df_peptide[pdb_df_peptide['residue_number'] == template_peptide_len + res]['atom_number'].values
+		for res in range(anchor_2 - template_peptide_len - 1, 1):	
+			pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes[res]), 'residue_number'] = len(peptide.sequence) + res
 
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
@@ -116,16 +115,17 @@ class pMHC(object):
 		self.pdb_filename = anchored_MHC_file_name
 
 		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
-		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == 1]
+		anchor_1 = peptide.primary_anchors[0]
+		anchor_2 = peptide.primary_anchors[1]
+		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1)))]
 		ppdb_peptide.df['ATOM'] = N_terminus
 		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
-
-		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'] == len(pep_seq)]
+		
+		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(anchor_2, len(peptide.sequence) + 1)))]
 		ppdb_peptide.df['ATOM'] = C_terminus
 		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/C_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
-
 		# DONE!
 
 	def RCD(self, peptide, RCD_dist_tol, num_loops, filestore):
@@ -133,9 +133,10 @@ class pMHC(object):
 		initialize_dir(filestore + '/3_RCD_data')
 
 		# Create loops.txt file
-		last_non_anchor = len(peptide.sequence) - 2
+		one_end = peptide.primary_anchors[0] + 1
+		other_end = peptide.primary_anchors[1] - 2
 		with open(filestore + "/2_input_to_RCD/loops.txt", 'w') as loops:
-			loops.write(filestore + "/2_input_to_RCD/anchored_pMHC.pdb 3 " + str(last_non_anchor) + " C " + peptide.sequence[2:last_non_anchor])
+			loops.write(filestore + "/2_input_to_RCD/anchored_pMHC.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
 		loops.close()
 
 		# Perform RCD:
@@ -151,17 +152,25 @@ class pMHC(object):
 		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query = "model")
 		os.remove(filestore + '/../../results.txt')
 
-	def set_anchor_xyz(self, reference, pep_seq, anchors):
+	def set_anchor_xyz(self, anchor_selection, peptide):
 
 		ppdb_peptide = PandasPdb()
-		ppdb_peptide.read_pdb(reference.pdb_filename)
+		ppdb_peptide.read_pdb(self.pdb_filename)
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 
 		# Only peptide
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C'] 
 
-		# Only anchors
-		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(anchors)]
+		# Only anchors (based on selection)
+		if anchor_selection == 'primary':
+			pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.peptide.primary_anchors)]
+			tolerance_anchors = peptide.primary_anchors
+		elif anchor_selection == 'secondary':
+			pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.peptide.secondary_anchors)]
+			tolerance_anchors = peptide.secondary_anchors
+		else:
+			pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin([])]
+			tolerance_anchors = []
 
 		# Only carbon-alpha atoms
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'] == 'CA']
@@ -169,7 +178,7 @@ class pMHC(object):
 		# Only positions
 		pdb_df_peptide = pdb_df_peptide[['x_coord', 'y_coord', 'z_coord']]
 
-		return pdb_df_peptide.to_numpy()
+		return pdb_df_peptide.to_numpy(), tolerance_anchors
 
 	def add_PTM_CONECT_fields(self, filestore, PTM_list, peptide_index):
 
