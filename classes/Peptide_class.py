@@ -75,7 +75,7 @@ class Peptide(object):
 				anchors = extract_anchors(peptide_sequence_noPTM, receptor_allotype, frequencies)
 			else:
 				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
-				anchors = "2,9"
+				anchors = "2," + str(len(peptide_sequence))
 
 		print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, peptide_sequence_noPTM)
@@ -166,10 +166,12 @@ class Peptide(object):
 		copy_file(PTMed_tidied, self.pdb_filename)
 		os.remove(PTMed_tidied)
 
-	def prepare_for_scoring(self, filestore, peptide_index, current_round):
+	def prepare_for_scoring(self, filestore, peptide_index, current_round, addH):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/pdbqt_peptides/peptide_" + str(peptide_index) + ".pdbqt"
-		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U lps -g -s > " + filestore + "/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
+		clean = "lps" if addH == "all" else "nphs_lps"
+
+		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U " + clean + " -g -s > " + filestore + "/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
 
 		# If the resulting .pdbqt is faulty, delete it. If it does not exist, it is also faulty, so skip whatever else. 
 		try:
@@ -267,7 +269,7 @@ class Peptide(object):
 			
 			return True
 
-	def fix_flexible_residues(self, filestore, receptor, peptide_index, current_round):
+	def fix_flexible_residues(self, filestore, receptor, peptide_index, current_round, addH):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
 		#minimized_receptor_loc = filestore + "/4_SMINA_data/minimized_receptors/receptor_" + str(peptide_index) + ".pdb"
@@ -315,7 +317,7 @@ class Peptide(object):
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			#print(CA_loc, C_loc)
-			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
+			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc, addH)
 			#print(matching)
 			#input()
 			if matching.shape[0] == 0: # Empty Solution

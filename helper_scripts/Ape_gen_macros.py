@@ -118,16 +118,15 @@ def copy_batch_of_files(src, dst, query):
 	for f in files:
 		if (query in f): shutil.copy(src + f, dst)
 
-def add_sidechains(pdb_filename, filestore, peptide_idx=-1, remove_heterogens=True,   \
-																add_hydrogens=False,	\
-																add_solvent=False,	  \
-																keep_IDs=False		  ):
+def add_sidechains(pdb_filename, filestore, add_hydrogens, peptide_idx=-1, remove_heterogens=True,
+				   add_solvent=False, keep_IDs=False):
+
 	fixer = PDBFixer(filename=pdb_filename)
 	fixer.findMissingResidues()
 	if remove_heterogens: fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
 	fixer.findMissingAtoms()
 	fixer.addMissingAtoms()
-	if add_hydrogens: fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
+	if add_hydrogens != "none": fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
 	if add_solvent: fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
 	if peptide_idx != -1:
 			pdb_filename = filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb'
@@ -334,54 +333,99 @@ def PTM_error_checking(amino_acid):
 
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
 
-def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
+def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc, addH):
 
 	# Note to change the 4-letter atoms if need be!
-	atom_dict = {'ALA':[["CA", "C", "CB"]],
-				 'VAL':[["CA", "C", "CB", "CG1", "CG2"]],
-				 'ILE':[["CA", "C", "CB", "CG1", "CG2", "CD"]],
-				 'LEU':[["CA", "C", "CB", "CG", "CD1", "CD2"]],
-				 'MET':[["CA", "C", "CB", "CG", "SD", "CE"]],
-				 'PHE':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"]],
-				 'TYR':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "HH"]],
-				 'TRP':[["CA", "C", "CB", "CG", "CD1", "CD2", "NE1", "HE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]],
-				 'SER':[["CA", "C", "CB", "OG", "HG1"]],
-				 'THR':[["CA", "C", "CB", "OG1", "HG1", "CG2"]],
-				 'ASN':[["CA", "C", "CB", "CG", "OD1", "ND2", "HD21", "HD22"]],
-				 'GLN':[["CA", "C", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"]],
-				 'CYS':[["CA", "C", "CB", "SG"]],
-				 'GLY':[["CA", "C"]],
-				 'PRO':[["CA", "C", "CB", "CG", "CD"]],
-				 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"]],
-				 'HIS':[["CA", "C", "CB", "CG", "ND1", "HD1", "CE1", "NE2", "CD2"], 
-						["CA", "C", "CB", "CG", "ND1", "HE2", "CE1", "NE2", "CD2"]],
-				 'LYS':[["CA", "C", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2", "HZ3"]],
-				 'ASP':[["CA", "C", "CB", "CG", "OD1", "OD2"]],
-				 'GLU':[["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]]
-				}
+	if addH != "none":
+		atom_dict = {'ALA':[["CA", "C", "CB"]],
+				 	 'VAL':[["CA", "C", "CB", "CG1", "CG2"]],
+				 	 'ILE':[["CA", "C", "CB", "CG1", "CG2", "CD"]],
+				 	 'LEU':[["CA", "C", "CB", "CG", "CD1", "CD2"]],
+				 	 'MET':[["CA", "C", "CB", "CG", "SD", "CE"]],
+				 	 'PHE':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"]],
+				 	 'TYR':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH", "HH"]],
+				 	 'TRP':[["CA", "C", "CB", "CG", "CD1", "CD2", "NE1", "HE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]],
+				 	 'SER':[["CA", "C", "CB", "OG", "HG1"]],
+				 	 'THR':[["CA", "C", "CB", "OG1", "HG1", "CG2"]],
+				 	 'ASN':[["CA", "C", "CB", "CG", "OD1", "ND2", "HD21", "HD22"]],
+				 	 'GLN':[["CA", "C", "CB", "CG", "CD", "OE1", "NE2", "HE21", "HE22"]],
+				 	 'CYS':[["CA", "C", "CB", "SG"]],
+				 	 'GLY':[["CA", "C"]],
+				 	 'PRO':[["CA", "C", "CB", "CG", "CD"]],
+				 	 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "HE", "CZ", "NH1", "HH11", "HH12", "NH2", "HH21", "HH22"]],
+				 	 'HIS':[["CA", "C", "CB", "CG", "ND1", "HD1", "CE1", "NE2", "CD2"], 
+							["CA", "C", "CB", "CG", "ND1", "HE2", "CE1", "NE2", "CD2"]],
+				 	 'LYS':[["CA", "C", "CB", "CG", "CD", "CE", "NZ", "HZ1", "HZ2", "HZ3"]],
+				 	 'ASP':[["CA", "C", "CB", "CG", "OD1", "OD2"]],
+				 	 'GLU':[["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]]
+					}
 
-	constraint_dict = {'ALA':[[["CA", "C"], ["CA", "CB"]]],
-					   'VAL':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"]]],
-					   'ILE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"], ["CG1", "CD"]]],
-					   'LEU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"]]],
-					   'MET':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "SD"], ["SD", "CE"]]],
-					   'PHE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"]]],
-					   'TYR':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"], ["CZ", "OH"], ["OH", "HH"]]],
-					   'TRP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "NE1"], ["NE1", "CE2"], ["NE1", "HE1"], ["CD2", "CE2"], ["CD2", "CE3"], ["CE2", "CZ2"], ["CE3", "CZ3"], ["CZ2", "CH2"], ["CH2", "CZ3"]]],
-					   'SER':[[["CA", "C"], ["CA", "CB"], ["CB", "OG"], ["OG", "HG1"]]],
-					   'THR':[[["CA", "C"], ["CA", "CB"], ["CB", "OG1"], ["OG1", "HG1"], ["CB", "CG2"]]],
-					   'ASN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND2"], ["ND2", "HD21"], ["ND2", "HD22"]]],
-					   'GLN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "NE2"], ["NE2", "HE21"], ["NE2", "HE22"]]],
-					   'CYS':[[["CA", "C"], ["CA", "CB"], ["CB", "SG"]]],
-					   'GLY':[[["CA", "C"]]],
-					   'PRO':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]]],
-					   'ARG':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "HE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"], ["NH1", "HH11"], ["NH1", "HH12"], ["NH2", "HH21"], ["NH2", "HH22"]]],
-					   'HIS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["ND1", "HD1"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]],
-							  [["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["NE2", "HE2"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]]],
-					   'LYS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "CE"], ["CE", "NZ"], ["NZ", "HZ1"], ["NZ", "HZ2"], ["NZ", "HZ3"]]],
-					   'ASP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "OD1"], ["CG", "OD2"]]],
-					   'GLU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "OE2"]]]
-					   }
+		constraint_dict = {'ALA':[[["CA", "C"], ["CA", "CB"]]],
+					   	   'VAL':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"]]],
+					   	   'ILE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"], ["CG1", "CD"]]],
+					   	   'LEU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"]]],
+					       'MET':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "SD"], ["SD", "CE"]]],
+					       'PHE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"]]],
+					       'TYR':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"], ["CZ", "OH"], ["OH", "HH"]]],
+					       'TRP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "NE1"], ["NE1", "CE2"], ["NE1", "HE1"], ["CD2", "CE2"], ["CD2", "CE3"], ["CE2", "CZ2"], ["CE3", "CZ3"], ["CZ2", "CH2"], ["CH2", "CZ3"]]],
+					       'SER':[[["CA", "C"], ["CA", "CB"], ["CB", "OG"], ["OG", "HG1"]]],
+					       'THR':[[["CA", "C"], ["CA", "CB"], ["CB", "OG1"], ["OG1", "HG1"], ["CB", "CG2"]]],
+					       'ASN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND2"], ["ND2", "HD21"], ["ND2", "HD22"]]],
+					       'GLN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "NE2"], ["NE2", "HE21"], ["NE2", "HE22"]]],
+					       'CYS':[[["CA", "C"], ["CA", "CB"], ["CB", "SG"]]],
+					       'GLY':[[["CA", "C"]]],
+					       'PRO':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]]],
+					       'ARG':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "HE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"], ["NH1", "HH11"], ["NH1", "HH12"], ["NH2", "HH21"], ["NH2", "HH22"]]],
+					       'HIS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["ND1", "HD1"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]],
+							      [["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["NE2", "HE2"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]]],
+					       'LYS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "CE"], ["CE", "NZ"], ["NZ", "HZ1"], ["NZ", "HZ2"], ["NZ", "HZ3"]]],
+					       'ASP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "OD1"], ["CG", "OD2"]]],
+					       'GLU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "OE2"]]]
+					      }
+	else:
+		atom_dict = {'ALA':[["CA", "C", "CB"]],
+				 	 'VAL':[["CA", "C", "CB", "CG1", "CG2"]],
+				 	 'ILE':[["CA", "C", "CB", "CG1", "CG2", "CD"]],
+				 	 'LEU':[["CA", "C", "CB", "CG", "CD1", "CD2"]],
+				 	 'MET':[["CA", "C", "CB", "CG", "SD", "CE"]],
+				 	 'PHE':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ"]],
+				 	 'TYR':[["CA", "C", "CB", "CG", "CD1", "CD2", "CE1", "CE2", "CZ", "OH"]],
+				 	 'TRP':[["CA", "C", "CB", "CG", "CD1", "CD2", "NE1", "CE2", "CE3", "CZ2", "CZ3", "CH2"]],
+				 	 'SER':[["CA", "C", "CB", "OG"]],
+				 	 'THR':[["CA", "C", "CB", "OG1", "CG2"]],
+				 	 'ASN':[["CA", "C", "CB", "CG", "OD1", "ND2"]],
+				 	 'GLN':[["CA", "C", "CB", "CG", "CD", "OE1", "NE2"]],
+				 	 'CYS':[["CA", "C", "CB", "SG"]],
+				 	 'GLY':[["CA", "C"]],
+				 	 'PRO':[["CA", "C", "CB", "CG", "CD"]],
+				 	 'ARG':[["CA", "C", "CB", "CG", "CD", "NE", "CZ", "NH1", "NH2"]],
+				 	 'HIS':[["CA", "C", "CB", "CG", "ND1", "CE1", "NE2", "CD2"]],
+				 	 'LYS':[["CA", "C", "CB", "CG", "CD", "CE", "NZ"]],
+				 	 'ASP':[["CA", "C", "CB", "CG", "OD1", "OD2"]],
+				 	 'GLU':[["CA", "C", "CB", "CG", "CD", "OE1", "OE2"]]
+					}
+
+		constraint_dict = {'ALA':[[["CA", "C"], ["CA", "CB"]]],
+					   	   'VAL':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"]]],
+					       'ILE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG1"], ["CB", "CG2"], ["CG1", "CD"]]],
+					       'LEU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"]]],
+					       'MET':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "SD"], ["SD", "CE"]]],
+					       'PHE':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"]]],
+					       'TYR':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "CE1"], ["CD2", "CE2"], ["CE1", "CZ"], ["CE2", "CZ"], ["CZ", "OH"]]],
+					       'TRP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD1"], ["CG", "CD2"], ["CD1", "NE1"], ["NE1", "CE2"], ["CD2", "CE2"], ["CD2", "CE3"], ["CE2", "CZ2"], ["CE3", "CZ3"], ["CZ2", "CH2"], ["CH2", "CZ3"]]],
+					       'SER':[[["CA", "C"], ["CA", "CB"], ["CB", "OG"]]],
+					       'THR':[[["CA", "C"], ["CA", "CB"], ["CB", "OG1"], ["CB", "CG2"]]],
+					       'ASN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND2"]]],
+					       'GLN':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "NE2"]]],
+					       'CYS':[[["CA", "C"], ["CA", "CB"], ["CB", "SG"]]],
+					       'GLY':[[["CA", "C"]]],
+					       'PRO':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"]]],
+					       'ARG':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "NE"], ["NE", "CZ"], ["CZ", "NH1"], ["CZ", "NH2"]]],
+					       'HIS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "ND1"], ["ND1", "CE1"], ["CE1", "NE2"], ["NE2", "CD2"], ["CD2", "CG"]]],
+					       'LYS':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "CE"], ["CE", "NZ"]]],
+					       'ASP':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "OD1"], ["CG", "OD2"]]],
+					       'GLU':[[["CA", "C"], ["CA", "CB"], ["CB", "CG"], ["CG", "CD"], ["CD", "OE1"], ["CD", "OE2"]]]
+					      }
 
 	no_of_cases = len(atom_dict[residue])
 	for i in range(no_of_cases):
@@ -448,71 +492,6 @@ def merge_connect_fields(list_of_pdbs, dst):
 	with open(dst, 'w') as pdb_file:
 		pdb_file.write(''.join(sorteded))
 	pdb_file.close()
-
-
-
-## FEATURE EXTRACTION FOR RF INPUT
-
-def extract_positions(position, peptide, feature_size):
-	scale = range(-int(np.floor(feature_size/2)), int(np.floor(feature_size/2)) + 1)
-	position_list = []
-	append_left = 0
-	append_right = 0
-	for x in scale:
-		if (position + x < 1):
-			position_list.append(0)
-			append_left += 1
-		elif (position + x > len(peptide)):
-			position_list.append(0)
-			append_right += 1
-		else:
-			position_list.append(position + x)
-	return position_list, append_left, append_right
-
-def extract_features(peptide, MHC, frequencies):
-
-	# Parameters (that more or less give the best RF performance)
-	windows_size = 5
-	feature_size = 5
-	wind = int(np.floor(windows_size/2))
-
-	# Loading the BLOSUM62 matrix
-	substitution_matrix = substitution_matrices.load("BLOSUM62")
-	substitution_matrix['X'] = substitution_matrix['*'] # X seems to be something else?
-
-	# Extract Ngram subsequences
-	aa_neighbors = [''.join(w) for w in list(ngrams(peptide, windows_size, pad_left=True, pad_right=True, 
-													left_pad_symbol='X', right_pad_symbol='X'))][wind:]
-	aa_neighbors = aa_neighbors[:len(aa_neighbors) - wind]
-	
-	# Extract all features for each subsequence
-	sub_seq_feature_list = []
-	for k, sub_seq in enumerate(aa_neighbors):
-	
-		# Break subsequence down to amino_acids
-		pep_sequence = list(sub_seq)
-		
-		# For each amino-acid, extract frequencies, important positions, and BLOSUM62!
-		feature_list = []
-		for j, amino_acid in enumerate(pep_sequence):
-			
-			blosum62_features = np.array(substitution_matrix[amino_acid])
-			freq_features = frequencies[(frequencies['allele'] == MHC) & (frequencies['length'] == len(peptide))]
-			position_list, append_left, append_right = extract_positions(j + k + 1 - wind, peptide, feature_size)
-			freq_features = freq_features[freq_features['position'].isin(position_list)][amino_acid].values
-			freq_features = np.hstack([blosum62_features, np.zeros(append_left), freq_features, np.zeros(append_right)])
-			feature_list.append(freq_features) 
-		
-		features = np.array(np.hstack(feature_list))
-		posn_feature = (k == 0)
-		posnplus1_feature = (k == 1)
-		posc_feature = (k == len(peptide) - 1) # Get those out!
-		features = np.hstack([features, [posn_feature], [posnplus1_feature], [posc_feature]])
-		sub_seq_feature_list.append(features)
-
-	X = np.array(np.array(sub_seq_feature_list, dtype=np.float), dtype=object)
-
-	return X
 
 def extract_anchors(peptide, MHC, frequencies):
 
