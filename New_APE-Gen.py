@@ -121,7 +121,7 @@ def peptide_refinement_and_scoring(peptide_index, filestore, PTM_list, receptor,
 	if(peptide_is_not_valid): return
 
 	# 4b. Optimize and score with SMINA (or other options, depending on args)
-	peptide.dock_score_with_SMINA(new_filestore, receptor, peptide_index) 
+	peptide.dock_score_with_SMINA(new_filestore, receptor, peptide_index, addH) 
 
 	# 5. Anchor filtering (based on anchor tolerance argument) (improvement from previous version)
 	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, peptide_index, current_round)
@@ -277,7 +277,7 @@ def apegen(args):
 	# C. User wants to model with no hydrogens involved, but also run an energy minimization routine. 
 	#    From my understanding, PDBFixer when given an MHC with no hydrogens will mess smth up not in terms of atoms, but in terms of bonds. 
 	#    Let's prevent users from actually doing this. 
-	if(addH == 'none') and (doReceptorMinimization == True):
+	if(addH == 'none') and (score_with_openmm == True):
 		sys.exit("\nTo use the openMM energy minimization routine, you need to provide polar/all hydrogens input.")
 	if (('phosphorylate 1' in PTM_list) or ('phosphorylate ' + str(len(peptide.sequence)) in PTM_list)) and (score_with_openmm):
 		sys.exit("\nERROR: Phosphorylation in N-terminus or C-terminus and openMM optimization is NOT supported. Force Field parameters are not released yet. Please omit OpenMM step for modelling this type of PTM.")
