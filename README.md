@@ -62,11 +62,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Implement different hydrogen configurations for APE-GEN, like a) Use all hydrogens (new version), b) Only polar hydrogens, c) No hydrogens (old version)
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
-- Double check on how the flexible residue code assignment works, because it may attempt to enter the `minimized_receptors` folder without a successfull CSP assignment.
-- Make `anchor tol` step optional.
 - Add `num_of_rounds` in homology modelling as an argument. 
 - Make function in the places where there is repeated code (there is one on peptide similarity tempalte selection)
 - Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
