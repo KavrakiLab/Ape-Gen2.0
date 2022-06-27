@@ -84,11 +84,12 @@ class pMHC(object):
 		# Here, I am replacing the (anchor) residues of the template peptide with the residues of the given peptide.
 		# Note to self: I don't think I need to replace for the other residues, as this is something RCD takes care of
 		anchor_1 = reference.peptide.primary_anchors[0]
+		if anchor_1 == 1: anchor_1 = 2
 		anchor_2 = reference.peptide.primary_anchors[1]
 		template_peptide_len = len(reference.peptide.sequence)
+		if anchor_2 == template_peptide_len - 1: anchor_2 = template_peptide_len
 		for res in range(1, anchor_1 + 1):
 			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == res, 'residue_name'] = all_one_to_three_letter_codes[peptide.sequence[res - 1]]
-		
 		for res in range(anchor_2 - template_peptide_len - 1, 1):
 			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == template_peptide_len + res, 'residue_name'] = all_one_to_three_letter_codes[peptide.sequence[len(peptide.sequence) + res - 1]]
 		
@@ -116,7 +117,9 @@ class pMHC(object):
 
 		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
 		anchor_1 = peptide.primary_anchors[0]
+		if anchor_1 == 1: anchor_1 = 2
 		anchor_2 = peptide.primary_anchors[1]
+		if anchor_2 == len(peptide.sequence) - 1: anchor_2 = len(peptide.sequence)
 		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1)))]
 		ppdb_peptide.df['ATOM'] = N_terminus
 		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
@@ -134,7 +137,9 @@ class pMHC(object):
 
 		# Create loops.txt file
 		one_end = peptide.primary_anchors[0] + 1
+		if one_end == 2: one_end = 3
 		other_end = peptide.primary_anchors[1] - 2
+		if other_end == len(peptide.sequence) - 3: other_end = other_end + 1
 		with open(filestore + "/2_input_to_RCD/loops.txt", 'w') as loops:
 			loops.write(filestore + "/2_input_to_RCD/anchored_pMHC.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
 		loops.close()
