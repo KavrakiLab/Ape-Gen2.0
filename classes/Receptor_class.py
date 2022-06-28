@@ -182,14 +182,13 @@ class Receptor(object):
 	def init_receptor(receptor_class, file_storage, peptide_input):
 		if verbose(): print("Processing Receptor Input")
 
-		initialize_dir(file_storage)
-
 		if receptor_class.endswith(".pdb"):
 			# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
 			receptor = Receptor.frompdb(receptor_class)
 			receptor_template_file = receptor_class
 		elif receptor_class.endswith(".fasta"):
 			# If this is a sequence, the template is taken by MODELLER
+			initialize_dir(file_storage + '/MODELLER_output')
 			receptor = Receptor.fromfasta(receptor_class, peptide_input, file_storage)
 			receptor_template_file = receptor.pdb_filename
 		elif receptor_class == "REDOCK":
@@ -198,6 +197,7 @@ class Receptor(object):
 			receptor_template_file = peptide.pdb_filename
 		else:
 			# If this is an allotype specification, fetch template like the peptide!
+			initialize_dir(file_storage + '/MODELLER_output')
 			receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage)
 			receptor_template_file = receptor.pdb_filename
 		return receptor, receptor_template_file
@@ -213,13 +213,16 @@ class Receptor(object):
 		return cls(allotype = "REDOCK", pdb_filename = peptide_input)
 
 	@classmethod
-	def fromallotype(cls, allotype, peptide_sequence, filestore):
+	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
 
 		# Pre-process: Remove any PTMs from the peptide sequence:
 		# peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
+		templates = pd.read_csv("./helper_files/Updated_template_information.csv")
+
+		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
+
 		if(allotype in templates['MHC'].tolist()):
 
 			if verbose(): print("Allotype found in our structural DB!")
@@ -228,6 +231,8 @@ class Receptor(object):
 			if verbose(): print("Will try to get the one that is closer to the peptide_input:")
 			# select the one closer to the whole sequence
 			aligner = Align.PairwiseAligner()
+			aligner.open_gap_score = -0.5
+			aligner.extend_gap_score = -0.1
 			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
 			score_list = []
 			template_sequences = templates['peptide'].tolist()
@@ -268,13 +273,14 @@ class Receptor(object):
 		flexible_residues = file.readline().strip()
 		return flexible_residues
 
-	def prepare_for_scoring(self, filestore, index=""):
+	def prepare_for_scoring(self, filestore, addH, index=""):
 
 		prep_receptor_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 		pdbqt_to_pdb_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
-		
 		self.pdbqt_filename = filestore + "/receptor_for_smina" + index + ".pdbqt"
-		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U lps > " + filestore + "/prepare_receptor4.log 2>&1"], shell=True)
+
+		clean = "lps" if addH == "all" else "nphs_lps"
+		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U" + clean + " > " + filestore + "/prepare_receptor4.log 2>&1"], shell=True)
 		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/receptor_for_smina_temp" + index + ".pdb > " + filestore + "/pdbqt_to_pdb.log 2>&1"], shell=True)
 
 		# Before we continue here, an issue seems to arise. pdbqt_to_pdb.py introduces some segment identifiers that need to be removed?

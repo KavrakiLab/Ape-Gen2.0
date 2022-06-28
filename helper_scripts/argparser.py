@@ -11,9 +11,6 @@ def APE_Gen_parser():
 	parser.add_argument("-r", "--rigid_receptor", action="store_true", help='Disable sampling of receptor degrees of freedom specified in flex_res.txt')
 	parser.add_argument("-v", "--verbose", action="store_true", help='Print extra information for debugging')
 	parser.add_argument("-p", "--save_only_pep_confs", action="store_true", help='Disable saving full conformations (peptide and MHC)')
-	#parser.add_argument("--n-mer-templates", default="", help='File with n-mer pdb templates.')
-	#parser.add_argument("--receptor-class-templates", default="", help='File with pdb receptor class templates')
-	#parser.add_argument("--flex_res", default="", help='File with flexible residues')
 	parser.add_argument('--anchors', default="", help='delimited list input', type=str)
 	parser.add_argument("-a", "--anchor_tol", type=float, default=2.0, help='Anchor tolerance (in angstroms) of first and last backbone atoms of peptide when filtering')
 	parser.add_argument("-o", "--score_with_openmm", action="store_true", help='Rescore full conformations with openmm (AMBER)')
@@ -24,4 +21,7 @@ def APE_Gen_parser():
 	parser.add_argument("--clean_rcd", action="store_true", help='Remove RCD folder at the end of each round')
 	parser.add_argument("--dir", type=str, default='intermediate_files', help='Location for all the intermediate files')
 	parser.add_argument("--force_restart", action="store_true", help='Force restart of APE-Gen *ONLY* in the first round and *ONLY* if no conformations are produced')
+	parser.add_argument("--anchor_selection", type=str, default='secondary', choices=['primary', 'secondary', 'none'], help="Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)")
+	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
+	parser.add_argument("--addH", type=str, default='all', choices=['all', 'polar', 'none'], help='Adding hydrogens (all/polar only/no hydrogens)')
 	return parser
