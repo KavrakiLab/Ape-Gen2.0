@@ -62,33 +62,22 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Implement different hydrogen configurations for APE-GEN, like a) Use all hydrogens (new version), b) Only polar hydrogens, c) No hydrogens (old version)
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
-- Locate all the PTM removal regex expressions and make a function instead
-- Make homology modelling into a different script in order not to ask for MODELLER keys for cases where HLA allotype has a known structure.
-- Double check on how the flexible residue code assignment works, because it may attempt to enter the `minimized_receptors` folder without a successfull CSP assignment.
-- Make `anchor tol` step optional.
 - Add `num_of_rounds` in homology modelling as an argument. 
 - Make function in the places where there is repeated code (there is one on peptide similarity tempalte selection)
-- Have a `write_string` function for all the yields/joins/opens/writes in the code (or maybe for each function do this inside it, the file is overwritten successfully without defining a new one)
 - Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
-- Implement `PDBFixer` steps in a better way (it's the same function in all of the 3 classes basically)
-- Make `os.remove` calls a macro function
 - The `receptor_template_file` variable in Section 1b is questionable, investigate more
-- Manually overwrite `prepare_ligand4.py` with the changes that do not cause errors
-- Get debug message inside the print statements happening in the classes
-- Fix `initialize_dir` function to accept a list of directories and avoid calling the function multiple times
 - Consider peptide methods which receptor is an input to be transferred to the `pMHC_class`, and a pMHC object defined
-- `peptide_index` in methods is annoying, maybe replace it with a new class field
-- `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
-- Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
+- REVISE `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
+- REVISE Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
 - Function documentation needs to be done thouroughly at some point
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
 - `5TRZ.pdb` is the only peptide with non-canonical anchors in both positions. For those cases, bring 2 peptide templates, one for each position and combine them. 
+- Prepare the code for RMSD comparison with PANDORA paper.
 - Testing/Testing/Testing...
 
 ### PTMs:
