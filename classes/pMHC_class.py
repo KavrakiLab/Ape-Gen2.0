@@ -1,6 +1,9 @@
 import pymol2
 
-from helper_scripts.Ape_gen_macros import initialize_dir, move_batch_of_files, merge_and_tidy_pdb, all_one_to_three_letter_codes, replace_CONECT_fields, merge_connect_fields
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir,	   \
+											move_batch_of_files, merge_and_tidy_pdb,			   \
+											all_one_to_three_letter_codes, replace_CONECT_fields,  \
+											merge_connect_fields, verbose
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -10,7 +13,6 @@ from pdbtools import pdb_splitmodel
 
 from subprocess import call
 import shutil
-import os
 
 # OPENMM
 from openmm.app import *
@@ -20,9 +22,9 @@ from sys import stdout
 
 class pMHC(object):
 
-	def __init__(self, pdb_filename, peptide = None, receptor = None):
+	def __init__(self, pdb_filename, peptide=None, receptor=None):
 		self.pdb_filename = pdb_filename
-		self.peptide = peptide
+		self.peptide = peptide # doesn't need PTMs
 		self.receptor = receptor
 
 	def align(self, reference, filestore):
@@ -148,14 +150,14 @@ class pMHC(object):
 		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/2_input_to_RCD/loops.txt >> " + filestore + "/3_RCD_data/rcd.log 2>&1"], shell=True)
  		
  		# Move files to back to destination folder (think about making a function for this)
-		move_batch_of_files(filestore + '/2_input_to_RCD/', filestore + '/3_RCD_data', query = "anchored_pMHC_")
+		move_batch_of_files(filestore + '/2_input_to_RCD/', filestore + '/3_RCD_data', query="anchored_pMHC_")
 
 		# Split the output into files, as the output .pdb has many models		
 		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input([filestore + "/3_RCD_data/anchored_pMHC_closed.pdb"],
-																  ), outname = "model")
+																  ), outname="model")
 		initialize_dir(filestore + '/3_RCD_data/splits')	
-		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query = "model")
-		os.remove(filestore + '/../../results.txt')
+		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query="model")
+		remove_file(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, anchor_selection, peptide):
 
@@ -211,14 +213,14 @@ class pMHC(object):
 				next_N = pdb_df_complex[(pdb_df_complex['residue_number'] == PTM_index + 1) & (pdb_df_complex['atom_name'] == 'N')]['atom_number'].item()
 				external_bonds_list.append((current_C, next_N))
 
-			conect = replace_CONECT_fields('./PTM_residue_templates/' + residue_name + '.conect',
-										   sub_pdb, external_bonds_list)
-			conected = ''.join(conect)
-			conect_file = filestore + '/5_openMM_conformations/PTM_conect_indexes/conect_' + str(peptide_index) + residue_name + str(PTM_index) + '.pdb'
-			with open(conect_file, 'w') as conect_handler:
-				conect_handler.write(conected)
-
+			conect_file = apply_function_to_file(func=replace_CONECT_fields, 
+												 input_filename='./PTM_residue_templates/' + residue_name + '.conect', 
+												 output_filename=filestore + '/5_openMM_conformations/PTM_conect_indexes/conect_' + 
+												 					str(peptide_index)  + residue_name + str(PTM_index) + '.pdb', 
+												 index_df=sub_pdb,
+												 external_bonds_list=external_bonds_list)
 			file_list.append(conect_file)
+
 
 		self.pdb_filename = filestore + '/5_openMM_conformations/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
 		merge_connect_fields(file_list, self.pdb_filename)
