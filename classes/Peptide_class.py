@@ -53,7 +53,7 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, primary_anchors = primary_anchors, secondary_anchors = secondary_anchors, index=peptide_index)
+		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
 
 	@classmethod
 	def init_peptide(cls, peptide_input):
@@ -96,13 +96,13 @@ class Peptide(object):
 			frequencies_alleles = pd.unique(frequencies['allele'])
 
 			if receptor_allotype in frequencies_alleles:
-				print("Receptor allotype has a known MHC binding motif!")
+				if verbose(): print("Receptor allotype has a known MHC binding motif!")
 				anchors = extract_anchors(self.sequence, receptor_allotype, frequencies)
 			else:
 				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
 				anchors = "2," + str(len(peptide_sequence))
 
-		print("Predicted anchors for the peptide: ", anchors)
+		if verbose(): print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, self.sequence)
 		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
 		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
@@ -154,10 +154,10 @@ class Peptide(object):
 		peptide_second_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 
 		# 7) Define the peptide template object
-		peptide_template = pMHC(pdb_filename = peptide_template_file, 
-								peptide = Peptide.frompdb(pdb_filename = peptide_template_file, 
-														  primary_anchors = template_major_anchors,
-														  secondary_anchors = template_secondary_anchors))
+		peptide_template = pMHC(pdb_filename=peptide_template_file, 
+								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
+														  primary_anchors=template_major_anchors,
+														  secondary_anchors=template_secondary_anchors))
 
 		# 8) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
@@ -212,9 +212,9 @@ class Peptide(object):
 		copy_file(PTMed_tidied, self.pdb_filename)
 		remove_file(PTMed_tidied)
 
-	def prepare_for_scoring(self, filestore, index, current_round, addH):
+	def prepare_for_scoring(self, filestore, current_round, addH):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
-		self.pdbqt_filename = filestore + "/pdbqt_peptides/peptide_" + str(index) + ".pdbqt"
+		self.pdbqt_filename = filestore + "/pdbqt_peptides/peptide_" + str(self.index) + ".pdbqt"
 		clean = "lps" if addH == "all" else "nphs_lps"
 
 		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U " + clean + " -g -s > " + filestore + "/pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
@@ -227,8 +227,8 @@ class Peptide(object):
 		seq = ''.join(seq).split("\n")[1]
 		if(len(seq) != len(self.sequence)):
 			#remove_file(self.pdbqt_filename)
-			with open(filestore + "/per_peptide_results/peptide_" + str(index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(index) + ",Rejected by prepare_ligand4.py,-\n")
+			with open(filestore + "/per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
 		else:
 			return False
@@ -238,40 +238,40 @@ class Peptide(object):
 
 		# SMINA docking and scoring
 		add_hydrogens = "True" if addH != "none" else "False"
-		self.pdb_filename =  filestore + "/Scoring_results/model_" + str(self.index) + ".pdb"
+		self.pdb_filename =  filestore + "/scoring_results/model_" + str(self.index) + ".pdb"
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
-				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  filestore + "/scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 8 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
-				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  filestore + "/scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
-				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  filestore + "/scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 8 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
-				  filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
+				  filestore + "/scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
-	def score_with_SMINA(self, filestore, receptor, index):
-		self.pdb_filename = filestore + "/Scoring_results/model_" + str(index) + ".pdb" 
+	def score_with_SMINA(self, filestore, receptor):
+		self.pdb_filename = filestore + "/scoring_results/model_" + str(self.index) + ".pdb" 
 		call(["smina -q --score_only --ligand " + self.pdbqt_filename + \
 			  " --receptor " + receptor.pdbqt_filename + " --out " + self.pdb_filename + \
-			  " > " + filestore + "/Scoring_results/smina.log 2>&1"], shell=True)
-		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(index) + ".pdb")    
+			  " > " + filestore + "/scoring_results/smina.log 2>&1"], shell=True)
+		move_file(receptor.pdb_filename, filestore + "/minimized_receptors/receptor_" + str(self.index) + ".pdb")    
 
-	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, index, current_round):
+	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
 
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(self.pdb_filename)
@@ -286,34 +286,34 @@ class Peptide(object):
 		pdb_peptide_anchors_xyz = pdb_df_peptide[['x_coord', 'y_coord', 'z_coord']].to_numpy()
 
 		# If difference is smaller than the tolerance, keep the file, else don't
-		anchor_difference = np.linalg.norm(pdb_peptide_anchors_xyz - peptide_template_anchors_xyz, axis = 1)
+		anchor_difference = np.linalg.norm(pdb_peptide_anchors_xyz - peptide_template_anchors_xyz, axis=1)
 		if np.all(anchor_difference < anchor_tol):
 			
 			# Keep the scores of the remaining survivors
 			with open(self.pdb_filename, 'r') as peptide_handler:
 				next(peptide_handler) # Skipping first line
 				affinity = peptide_handler.readline().replace("\n", "").split(" ")[2]
-			with open(filestore + "/per_peptide_results/peptide_" + str(index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(index) + ",Successfully Modeled," + str(affinity) + "\n")
+			with open(filestore + "/per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Successfully Modeled," + str(affinity) + "\n")
 
-			dst = filestore + "/Anchor_filtering/peptide_" + str(index) + ".pdb"
+			dst = filestore + "/anchor_filtering/peptide_" + str(self.index) + ".pdb"
 			copy_file(self.pdb_filename, dst)
 			self.pdb_filename = dst
 			return False
 
 		else:
 			# delete the minimized receptor coming from SMINA
-			if(receptor.doMinimization and os.path.exists(filestore + "/flexible_receptors/receptor_" + str(index) + ".pdb")): remove_file(filestore + "/flexible_receptors/receptor_" + str(index) + ".pdb")
+			if(receptor.doMinimization and os.path.exists(filestore + "/flexible_receptors/receptor_" + str(self.index) + ".pdb")): remove_file(filestore + "/flexible_receptors/receptor_" + str(self.index) + ".pdb")
 			
 			# Keep a log for the anchor difference
-			with open(filestore + "/Anchor_filtering/peptide_" + str(index) + ".log", 'a+') as anchor_log:
-				anchor_log.write(str(current_round) + "," + str(index) + "," + ','.join(map(str, anchor_difference))) 
+			with open(filestore + "/anchor_filtering/peptide_" + str(self.index) + ".log", 'a+') as anchor_log:
+				anchor_log.write(str(current_round) + "," + str(self.index) + "," + ','.join(map(str, anchor_difference))) 
 			
 			# Keep this result for final printing
 			faulty_positions = (anchor_difference > anchor_tol)*self.secondary_anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
-			with open(filestore + "/per_peptide_results/peptide_" + str(index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
+			with open(filestore + "/per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
 			
 			return True
 
@@ -355,13 +355,13 @@ class Peptide(object):
 			# CA location
 			CA_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'CA'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(CA_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis=1)
 			CA_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			# C location
 			C_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'C'][['x_coord', 'y_coord', 'z_coord']])
 			loc_indexes = np.all(np.isclose(C_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
-										  rtol=1e-05, atol=1e-08, equal_nan=False), axis = 1)
+										  rtol=1e-05, atol=1e-08, equal_nan=False), axis=1)
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			#print(CA_loc, C_loc)
@@ -396,19 +396,19 @@ class Peptide(object):
 
 		return False
 
-	def create_peptide_receptor_complexes(self, filestore, receptor, index):
+	def create_peptide_receptor_complexes(self, filestore, receptor):
 
 		# Unify peptide and receptor together
-		pMHC_complex = filestore + "/pMHC_complexes/pMHC_" + str(index) + ".pdb"
+		pMHC_complex = filestore + "/pMHC_complexes/pMHC_" + str(self.index) + ".pdb"
 		removed = remove_remarks_and_others_from_pdb(self.pdb_filename)
 		overwritten = ''.join(removed)
 		with open(self.pdb_filename, 'w') as peptide_handler:
 			peptide_handler.write(overwritten)
 		
 		if not receptor.doMinimization: copy_file(filestore + "/receptor_for_smina.pdb",
-												  filestore + "/minimized_receptors/receptor_" + str(index) + ".pdb")
+												  filestore + "/minimized_receptors/receptor_" + str(self.index) + ".pdb")
 		
-		merge_and_tidy_pdb([filestore + "/minimized_receptors/receptor_" + str(index) + ".pdb", 
+		merge_and_tidy_pdb([filestore + "/minimized_receptors/receptor_" + str(self.index) + ".pdb", 
 							self.pdb_filename], pMHC_complex)
 
 

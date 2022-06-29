@@ -206,11 +206,11 @@ class Receptor(object):
 
 	@classmethod
 	def frompdb(cls, pdb_filename): # Checking if .pdb file is ok maybe?
-		return cls(allotype = "In PDB", pdb_filename = pdb_filename)
+		return cls(allotype="In PDB", pdb_filename=pdb_filename)
 
 	@classmethod
 	def fromredock(cls, peptide_input):
-		return cls(allotype = "REDOCK", pdb_filename = peptide_input)
+		return cls(allotype="REDOCK", pdb_filename=peptide_input)
 
 	@classmethod
 	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
@@ -242,7 +242,7 @@ class Receptor(object):
 			templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
 			pdb_filename = templates['pdb_code'].sample(n=1).values[0]
 			if verbose(): print("Got " + pdb_filename + "!")
-			return(cls(allotype = allotype, pdb_filename = './new_templates/' + pdb_filename))
+			return(cls(allotype=allotype, pdb_filename='./new_templates/' + pdb_filename))
 		
 		# Check #2: Existing sequence
 		if verbose(): print("Allotype not found in our structural DB. Let's see if it's in our sequence DB...")
@@ -250,7 +250,7 @@ class Receptor(object):
 			if seq_record.id == allotype:
 				if verbose(): print("Allotype found in our sequence DB! Modelling it through homology modelling:")
 				pdb_filename, new_allotype = model_receptor(str(seq_record.seq), peptide_sequence, filestore)
-				return(cls(allotype = new_allotype, pdb_filename = pdb_filename))
+				return(cls(allotype=new_allotype, pdb_filename=pdb_filename))
 
 		print("Allotype not found in our sequence DB... Please check the list of supported allotypes (or pass down a fasta sequence instead.")
 		print("Aborting....")
@@ -265,7 +265,7 @@ class Receptor(object):
 		for seq_record in SeqIO.parse(fasta_file, "fasta"):
 			sequence = seq_record.seq
 		pdb_filename, new_allotype = model_receptor(str(sequence), peptide_sequence, filestore)
-		return(cls(allotype = new_allotype, pdb_filename = pdb_filename))
+		return(cls(allotype=new_allotype, pdb_filename=pdb_filename))
 
 	@staticmethod	
 	def load_flexible_residues():
