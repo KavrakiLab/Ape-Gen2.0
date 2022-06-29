@@ -80,13 +80,17 @@ rev_anchor_dictionary = {'N_+0' : {'8': 1, '9': 1, '10': 1, '11': 1, '12': 1, '1
 
 ## FUNCTIONS
 
-def initialize_dir(*dir_names):
-	for dir_name in dir_names:
+def initialize_dir(dir_name):
+	if type(dir_name) == str:
 		if os.path.exists(dir_name):
 			shutil.rmtree(dir_name)
 		else:
 			pass
 		os.makedirs(dir_name)
+	elif type(dir_name) == list:
+		for dir in dir_name:
+			initialize_dir(dir)
+		
 
 def copy_file(src, dst):
 	shutil.copy(src, dst)
@@ -218,7 +222,7 @@ def create_csv_from_list_of_files(csv_filename, list_of_files):
 def pretty_print_analytics(csv_location, verbose=True):
 
 	results_csv = pd.read_csv(csv_location, names=['Round', 'Peptide index', 'Debug', 'Affinity'])
-	results_csv.sort_values(by=['Round', 'Peptide index'], inplace = True)
+	results_csv.sort_values(by=['Round', 'Peptide index'], inplace=True)
 	results_csv.to_csv(csv_location, index=False)
 
 	results_csv = results_csv[results_csv['Affinity'] != '-']
@@ -226,7 +230,7 @@ def pretty_print_analytics(csv_location, verbose=True):
 	if verbose:
 		print("Total number of overall conformations: " + str(no_of_final_conformations))
 		print("\nAnalytics:")
-		print(results_csv.to_markdown(index = False))
+		print(results_csv.to_markdown(index=False))
 	return results_csv
 
 

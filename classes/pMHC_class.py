@@ -22,7 +22,7 @@ from sys import stdout
 
 class pMHC(object):
 
-	def __init__(self, pdb_filename, peptide = None, receptor = None):
+	def __init__(self, pdb_filename, peptide=None, receptor=None):
 		self.pdb_filename = pdb_filename
 		self.peptide = peptide # doesn't need PTMs
 		self.receptor = receptor
@@ -150,13 +150,13 @@ class pMHC(object):
 		call(["rcd -e 1 -x ./RCD_required_files/dunbrack.bin --energy_file ./RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " " + filestore + "/2_input_to_RCD/loops.txt >> " + filestore + "/3_RCD_data/rcd.log 2>&1"], shell=True)
  		
  		# Move files to back to destination folder (think about making a function for this)
-		move_batch_of_files(filestore + '/2_input_to_RCD/', filestore + '/3_RCD_data', query = "anchored_pMHC_")
+		move_batch_of_files(filestore + '/2_input_to_RCD/', filestore + '/3_RCD_data', query="anchored_pMHC_")
 
 		# Split the output into files, as the output .pdb has many models		
 		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input([filestore + "/3_RCD_data/anchored_pMHC_closed.pdb"],
-																  ), outname = "model")
+																  ), outname="model")
 		initialize_dir(filestore + '/3_RCD_data/splits')	
-		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query = "model")
+		move_batch_of_files('./', filestore + '/3_RCD_data/splits', query="model")
 		remove_file(filestore + '/../../results.txt')
 
 	def set_anchor_xyz(self, anchor_selection, peptide):
