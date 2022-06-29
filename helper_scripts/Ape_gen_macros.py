@@ -19,15 +19,16 @@ from nltk import ngrams
 from pdbfixer import PDBFixer
 from openmm.app import PDBFile
 
-# MODELLER
-try:
-	from modeller import *
-	from modeller.automodel import *
-except:
-	print("Error with importing Modeller: Make sure license key is correct.")
-	sys.exit(0)
-
 ## MACROS
+
+# set verbose
+global verbose_var
+verbose_var = False
+def verbose():
+	return verbose_var
+def set_verbose(val):
+	global verbose_var
+	verbose_var = val
 
 # Three-to-one (and vice versa) AA transformation
 standard_three_to_one_letter_code = {'ARG':'R', 'HIS':'H', 'LYS':'K', 'ASP':'D', 'GLU':'E', \
@@ -79,28 +80,17 @@ rev_anchor_dictionary = {'N_+0' : {'8': 1, '9': 1, '10': 1, '11': 1, '12': 1, '1
 
 ## FUNCTIONS
 
-def AA_error_checking(amino_acid):
-	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
-		print("The provided amino acid in the sequence is wrong")
-		sys.exit(0)
-
-def process_anchors(anchors, pep_seq):
-	# Returns the set of anchors
-	pep_length = len(re.sub('[a-z]', '', pep_seq)) # Remove any PTMs that may still exist in the sequence
-	anchor_not = set([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")])
-	return anchor_not
-
-def jaccard_distance(a, b):
-	# Computes jaccard distance between 2 sets
-	c = a.intersection(b)
-	return float(len(c)) / (len(a) + len(b) - len(c))
-
-def initialize_dir(dirname):
-	if os.path.exists(dirname):
-		shutil.rmtree(dirname)
-	else:
-		pass
-	os.makedirs(dirname)
+def initialize_dir(dir_name):
+	if type(dir_name) == str:
+		if os.path.exists(dir_name):
+			shutil.rmtree(dir_name)
+		else:
+			pass
+		os.makedirs(dir_name)
+	elif type(dir_name) == list:
+		for dir in dir_name:
+			initialize_dir(dir)
+		
 
 def copy_file(src, dst):
 	shutil.copy(src, dst)
@@ -118,6 +108,9 @@ def copy_batch_of_files(src, dst, query):
 	for f in files:
 		if (query in f): shutil.copy(src + f, dst)
 
+def remove_file(filename):
+	os.remove(filename)
+	
 def add_sidechains(pdb_filename, filestore, add_hydrogens, peptide_idx=-1, remove_heterogens=True,
 				   add_solvent=False, keep_IDs=False):
 
@@ -148,6 +141,16 @@ def merge_and_tidy_pdb(list_of_pdbs, dst):
 	with open(dst, 'w') as pdb_file:
 		pdb_file.write(''.join(reatomed))
 	pdb_file.close()
+
+def apply_function_to_file(func, input_filename, output_filename="", **kwargs):
+	if output_filename == "": output_filename = input_filename
+
+	overwritten = func(input_filename, **{key: value for key, value in kwargs.items() if key in func.__code__.co_varnames})
+	overwritten = ''.join(overwritten)
+
+	with open(output_filename, 'w') as output:
+		output.write(overwritten)
+	return output_filename
 
 def rename_chains(pdb_filename, chain_from, chain_to, dst):
 	renamed = pdb_rplchain.run(open(pdb_filename, 'r'), (chain_from, chain_to))
@@ -216,118 +219,20 @@ def create_csv_from_list_of_files(csv_filename, list_of_files):
 			with open(filename, 'rb') as readfile:
 				shutil.copyfileobj(readfile, outfile)
 
-def pretty_print_analytics(csv_location):
+def pretty_print_analytics(csv_location, verbose=True):
 
 	results_csv = pd.read_csv(csv_location, names=['Round', 'Peptide index', 'Debug', 'Affinity'])
-	results_csv.sort_values(by=['Round', 'Peptide index'], inplace = True)
+	results_csv.sort_values(by=['Round', 'Peptide index'], inplace=True)
 	results_csv.to_csv(csv_location, index=False)
 
 	results_csv = results_csv[results_csv['Affinity'] != '-']
 	no_of_final_conformations = results_csv.shape[0]
-	print("Total number of overall conformations: " + str(no_of_final_conformations))
-	print("\nAnalytics:")
-	print(results_csv.to_markdown(index = False))
+	if verbose:
+		print("Total number of overall conformations: " + str(no_of_final_conformations))
+		print("\nAnalytics:")
+		print(results_csv.to_markdown(index=False))
 	return results_csv
 
-## PTMs
-
-# Different PTMs
-
-phosphorylation_list = ['pS', 'pT', 'pY']
-acetylation_list = ['aK'] # Check details on pytms -> This is nmot working well, it renames all hydrogens to PyMOL ones
-carbamylation_list = ['cK'] # Check details on pytms
-citrullination_list = ['cR'] 
-methylation_list = ['mmK', 'mdK', 'mtK'] # Check details on pytms
-nitration_list = ['nY', 'nW'] # Check details on pytms
-s_nitrosylation_list = ['nC']
-p_hydroxylation_list = ['nP'] # Check details on pytms
-# malondialdehyde_list = ['maK'] # Check details on pytms, but probably it's too complicated to use that one
-c_oxidation_list = ['xhC', 'xoC', 'xdC'] # Check details on pytms
-m_oxidation_list = ['oM'] # Check details on pytms
-
-
-def sequence_PTM_processing(sequence):
-	sequence_list = re.sub( r"([A-Z])", r"\1 ", sequence).split() # Split pep sequence while retaining the PTM
-		
-	PTM_list = []
-	for i, amino_acid in enumerate(sequence_list):
-		if len(amino_acid) > 1:
-			prefix = PTM_error_checking(amino_acid)
-			AA_error_checking(amino_acid[1])
-			PTM_list.append(prefix + str(i + 1))
-		else:
-			AA_error_checking(amino_acid)
-	return PTM_list
-
-def PTM_error_checking(amino_acid):
-	prefix = amino_acid[0]
-	if prefix == 'p':
-		if amino_acid in phosphorylation_list:
-			return "phosphorylate "
-		else:
-			print("The only amino acids that support phosphorylation are S, T and Y")
-			sys.exit(0)
-	elif prefix == 'n':
-		if amino_acid in s_nitrosylation_list: # Keep in mind that we will need an elif here for the rest of n's
-			return "nitrosylate "
-		elif amino_acid in p_hydroxylation_list:
-			return "proline-hydroxylate "
-		elif amino_acid in nitration_list:
-			return "nitrate "
-		else:
-			print("The PTMs that have the n as prefix are s-nitrosylation and p-hydroxylation (maybe nitration also). For these PTMs, the only supported amino acids are C, and P (maybe W and Y)")
-			sys.exit(0)
-	elif prefix == 'c':
-		if amino_acid in citrullination_list: # Keep in mind that we will need an elif here for the rest of c's
-			return "citrullinate "
-		elif amino_acid in carbamylation_list:
-			return "carbamylate "
-		else:
-			print("The PTMs that have the c as prefix are carbamylation and citrullination (maybe c_oxidation also). For these PTMs, the only supported amino acids are C, K and R")
-			sys.exit(0)
-	elif prefix == 'a':
-		if amino_acid in acetylation_list:
-			return "acetylate "
-		else:
-			print("The PTM that has the a as prefix is acetylation. For these PTM, the only supported amino acid is K.")
-			sys.exit(0)
-	elif prefix == 'm':
-		if amino_acid in methylation_list:
-			if amino_acid[1] == 'm':
-				return "methylate "
-			elif amino_acid[1] == 'd':
-				return "di-methylate "
-			elif amino_acid[1] == 't':
-				return "tri-methylate "
-			else:
-				print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
-				sys.exit(0)
-		else:
-			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
-			sys.exit(0)
-	elif prefix == 'x':
-		if amino_acid in c_oxidation_list:
-			if amino_acid[1] == 'h':
-				return "cysteine-hydroxydate "
-			elif amino_acid[1] == 'o':
-				return "cysteine-oxydate "
-			elif amino_acid[1] == 'd':
-				return "cysteine-dioxydate "
-			else:
-				print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
-				sys.exit(0)
-		else:
-			print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
-			sys.exit(0)
-	elif prefix == 'o':
-		if amino_acid in m_oxidation_list:
-			return "methionine-oxidization "
-		else:
-			print("PTM chosen is methionine oxidization. For these PTM, the only supported amino acid is M.")
-			sys.exit(0)
-	else:
-		print("Wrong PTM prefix, check PTM notation")
-		sys.exit(0)
 
 
 
