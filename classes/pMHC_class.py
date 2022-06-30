@@ -215,14 +215,14 @@ class pMHC(object):
 
 			conect_file = apply_function_to_file(func=replace_CONECT_fields, 
 												 input_filename='./PTM_residue_templates/' + residue_name + '.conect', 
-												 output_filename=filestore + '/5_openMM_conformations/PTM_conect_indexes/conect_' + 
+												 output_filename=filestore + '/5_openMM_conformations/12_PTM_conect_indexes/conect_' + 
 												 					str(peptide_index)  + residue_name + str(PTM_index) + '.pdb', 
 												 index_df=sub_pdb,
 												 external_bonds_list=external_bonds_list)
 			file_list.append(conect_file)
 
 
-		self.pdb_filename = filestore + '/5_openMM_conformations/connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
+		self.pdb_filename = filestore + '/5_openMM_conformations/13_connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
 		merge_connect_fields(file_list, self.pdb_filename)
 
 	def minimizeConf(self, filestore, best_energy, device='CPU'):
@@ -283,7 +283,7 @@ class pMHC(object):
 		if energy < best_energy:
 			best_energy = energy
 			path, file = os.path.split(self.pdb_filename)
-			r = PDBReporter(filestore + '/5_openMM_conformations/minimized_complexes/' + file, 1)
+			r = PDBReporter(filestore + '/5_openMM_conformations/14_minimized_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
 			
 		return best_energy 
