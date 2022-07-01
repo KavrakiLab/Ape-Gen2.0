@@ -122,15 +122,15 @@ def add_sidechains(pdb_filename, filestore, add_hydrogens, peptide_idx=-1, remov
 	if add_hydrogens != "none": fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
 	if add_solvent: fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
 	if peptide_idx != -1:
-			pdb_filename = filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb'
+			pdb_filename = filestore + '/02_add_sidechains/PTMed_' + str(peptide_idx) + '.pdb'
 	
 	fp = open(pdb_filename, 'w')
 	PDBFile.writeFile(fixer.topology, fixer.positions, fp, keepIds=keep_IDs)
 	fp.close()
 
 	if peptide_idx != -1:
-		copy_file(filestore + '/add_sidechains/PTMed_' + str(peptide_idx) + '.pdb', 
-							filestore + '/PTMed_peptides/PTMed_' + str(peptide_idx) + '.pdb')
+		copy_file(filestore + '/02_add_sidechains/PTMed_' + str(peptide_idx) + '.pdb', 
+							filestore + '/03_PTMed_peptides/PTMed_' + str(peptide_idx) + '.pdb')
 	return pdb_filename
 
 def merge_and_tidy_pdb(list_of_pdbs, dst):
