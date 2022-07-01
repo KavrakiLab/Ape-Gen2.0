@@ -61,6 +61,9 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 
 ### Main Workflow:
 
+#### Debugging on large scale experiments:
+- FileNotFoundError: This is particularly coming from RCD, there is a race condition, as the split files are being store initially on root directory before they are moved. These should be stored from the get-go in the folders.
+
 #### Minor issues:
 - Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc.
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
