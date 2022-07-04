@@ -137,30 +137,30 @@ class pMHC(object):
 		
 		initialize_dir(filestore + '/3_RCD_data')
 
-        # Create loops.txt file
-        os.chdir(filestore + "/2_input_to_RCD/")
-        one_end = peptide.primary_anchors[0] + 1
-        if one_end == 2: one_end = 3
-        other_end = peptide.primary_anchors[1] - 2
-        if other_end == len(peptide.sequence) - 3: other_end = other_end + 1
-        with open("./loops.txt", 'w') as loops:
-        	loops.write("anchored_pMHC.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
-        loops.close()
+		# Create loops.txt file
+		os.chdir(filestore + "/2_input_to_RCD/")
+		one_end = peptide.primary_anchors[0] + 1
+		if one_end == 2: one_end = 3
+		other_end = peptide.primary_anchors[1] - 2
+		if other_end == len(peptide.sequence) - 3: other_end = other_end + 1
+		with open("./loops.txt", 'w') as loops:
+			loops.write("anchored_pMHC.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
+		loops.close()
 
-        # Call RCD
-        call(["rcd -e 1 -x ../../../RCD_required_files/dunbrack.bin --energy_file ../../../RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1"], shell=True)
+		# Call RCD
+		call(["rcd -e 1 -x ../../../RCD_required_files/dunbrack.bin --energy_file ../../../RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1"], shell=True)
 
-        # Move files to back to destination folder
-        move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_")
-        move_batch_of_files('./', '../3_RCD_data/', query="results")
-        os.chdir("../3_RCD_data/")
+		# Move files to back to destination folder
+		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_")
+		move_batch_of_files('./', '../3_RCD_data/', query="results")
+		os.chdir("../3_RCD_data/")
 
-        # Split the output into files, as the output .pdb has many models               
-        splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_closed.pdb"]), outname="model")
-        initialize_dir('./splits')
-        move_batch_of_files('./', './splits', query="model")
-        os.chdir("../../../")
-        # DONE!
+		# Split the output into files, as the output .pdb has many models			   
+		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_closed.pdb"]), outname="model")
+		initialize_dir('./splits')
+		move_batch_of_files('./', './splits', query="model")
+		os.chdir("../../../")
+		# DONE!
 
 	def set_anchor_xyz(self, anchor_selection, peptide):
 
