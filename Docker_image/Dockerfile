@@ -41,7 +41,7 @@ RUN ./Miniconda3-latest-Linux-x86_64.sh -b -p /conda
 ENV PATH "/conda/bin:$PATH"
 
 # environment.yml has pdbfixer, numpy, mdtraj and openmm
-COPY environment.yml /environment.yml
+COPY ./Docker_image/environment.yml /environment.yml
 RUN conda env create -f /environment.yml
 RUN echo "source activate apegen" >> ~/.bashrc
 ENV PATH "/conda/envs/apegen/bin:$PATH"
@@ -82,10 +82,13 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/r
 # Probably you should be cloning the directory if you want to build the image yourself?
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
+ADD . $HOME/data/
 
 # replace files that cause warnings and errors
-COPY /replacement_files/replace_files.sh /replace_files.sh
-RUN echo "sh /replace_files.sh" >> ~/.bashrc
+# COPY /replacement_files/replace_files.sh /replace_files.sh
+# RUN echo "sh /replace_files.sh" >> ~/.bashrc
+
+WORKDIR /data
 
 ENTRYPOINT ["bash"]
 
