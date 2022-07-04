@@ -81,17 +81,20 @@ rev_anchor_dictionary = {'N_+0' : {'8': 1, '9': 1, '10': 1, '11': 1, '12': 1, '1
 ## FUNCTIONS
 
 def initialize_dir(dir_name):
-	if type(dir_name) == str:
-		if os.path.exists(dir_name):
-			shutil.rmtree(dir_name)
-		else:
-			pass
-		os.makedirs(dir_name)
-	elif type(dir_name) == list:
-		for dir in dir_name:
-			initialize_dir(dir)
+    if type(dir_name) == str:
+        if os.path.exists(dir_name):
+            for root, dirs, files in os.walk(dir_name):
+                for f in files:
+                    os.unlink(os.path.join(root, f))
+                for d in dirs:
+                    shutil.rmtree(os.path.join(root, d))
+        else:
+            os.umask(0)
+            os.makedirs(dir_name,mode=0o777)
+    elif type(dir_name) == list:
+        for dir in dir_name:
+            initialize_dir(dir)
 		
-
 def copy_file(src, dst):
 	shutil.copy(src, dst)
 
