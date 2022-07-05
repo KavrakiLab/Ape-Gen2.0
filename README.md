@@ -62,6 +62,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Rethink `PTM_list` (corrections are probably very minor)
 - Eventually prune image space by removing unwanted packages from `environment.yml`
 - Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc.
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)

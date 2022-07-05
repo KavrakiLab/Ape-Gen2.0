@@ -65,7 +65,7 @@ def rescoring_after_openmm(conf_index, filestore, current_round, peptide_templat
 	# Done!
 	return
 
-def prepare_for_openmm(conf_index, filestore, peptide, PTM_list, addH):
+def prepare_for_openmm(conf_index, filestore, peptide, addH):
 
 	# 1. Run Receptor through PDBFixer, as the non-polar hydrogens could be in wrong places (they do not participate in the SMINA Minimization process):
 	receptor = Receptor.frompdb(filestore + '/4_SMINA_data/09_minimized_receptors/receptor_' + str(conf_index) + ".pdb")
@@ -83,12 +83,12 @@ def prepare_for_openmm(conf_index, filestore, peptide, PTM_list, addH):
 	pMHC_complex = pMHC(pdb_filename=pMHC_conformation, peptide=peptide)
 
 	# 3. If there is a phosphorylation somewhere, we need to give the appropriate CONECT fields to the PTM residue
-	pMHC_complex.add_PTM_CONECT_fields(filestore, PTM_list, conf_index)
+	pMHC_complex.add_PTM_CONECT_fields(filestore, peptide.PTM_list, conf_index)
 
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH):
+def peptide_refinement_and_scoring(index, original_peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
 	new_filestore = filestore + '/4_SMINA_data'
@@ -100,7 +100,7 @@ def peptide_refinement_and_scoring(index, peptide, filestore, receptor, toleranc
 	assembled_peptide = new_filestore + '/01_assembled_peptides/assembled_' + str(index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 
-	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index)
+	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index, PTM_list = peptide.original_peptide)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=index, add_hydrogens=addH)
