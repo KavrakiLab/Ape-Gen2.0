@@ -106,7 +106,8 @@ def peptide_refinement_and_scoring(index, original_peptide, filestore, receptor,
 	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=index, add_hydrogens=addH)
 
 	# 3. Do PTMs
-	peptide.perform_PTM(new_filestore)
+	peptide_is_not_valid = peptide.perform_PTM(new_filestore, current_round)
+	if(peptide_is_not_valid): return
 
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
@@ -294,7 +295,7 @@ def apegen(args):
 
 		# Code for non-parallel execution and debugging
 
-		# for argument in arg_list:
+		#for argument in arg_list:
 		#    print(argument)
 		#    peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7], argument[8])
 
