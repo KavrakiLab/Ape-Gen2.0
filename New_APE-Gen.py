@@ -100,7 +100,7 @@ def peptide_refinement_and_scoring(index, original_peptide, filestore, receptor,
 	assembled_peptide = new_filestore + '/01_assembled_peptides/assembled_' + str(index) + '.pdb'
 	merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 
-	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index, PTM_list = peptide.original_peptide)
+	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index, PTM_list = original_peptide.PTM_list)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
 	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=index, add_hydrogens=addH)
