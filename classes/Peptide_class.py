@@ -38,7 +38,7 @@ class Peptide(object):
 
 
 	@classmethod
-	def frompdb(cls, pdb_filename, primary_anchors=None, secondary_anchors=None, peptide_index=-1):
+	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, peptide_index=-1):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -53,7 +53,7 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
+		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
 
 	@classmethod
 	def init_peptide(cls, peptide_input):
