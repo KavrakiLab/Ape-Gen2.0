@@ -189,16 +189,29 @@ class Peptide(object):
 	# 	copy_file(filestore + '/02_add_sidechains/PTMed_' + str(self.index) + '.pdb', 
 	# 						filestore + '/03_PTMed_peptides/PTMed_' + str(self.index) + '.pdb')
 
-	def perform_PTM(self, filestore):
+	def perform_PTM(self, filestore, current_round):
+
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
 		# Maybe one day...
 		log_file = filestore + '/03_PTMed_peptides/PTM.log'
 		self.pdb_filename = filestore + "/03_PTMed_peptides/PTMed_" + str(self.index) + ".pdb"
+		ptm_indexes = []
 		for ptm in self.PTM_list:
 			PTM, selection = ptm.split(' ', 1)
+			ptm_indexes.append(int(selection))
 			call(["pymol -qc ./pymol_scripts/" + PTM + ".pml -- " + self.pdb_filename + " " + selection + " " + self.pdb_filename + " > " + log_file + " 2>&1"], shell=True)
 
-		# For some reason, after this step, I get peptide .pdb files with:
+		# Further checking the PTMed pdb to see if it actually is canonical and pymol failed; No way to see this from the .log file...
+		# When we have no PTM, residue list should be empty and pymol_failed always False.
+		ppdb = PandasPdb()
+		ppdb.read_pdb(self.pdb_filename)
+		pdb_df = ppdb.df['ATOM']
+		residues = list(pd.unique(pdb_df[pdb_df['residue_number'].isin(ptm_indexes)]['residue_name']))
+		pymol_failed = any(residue in list(standard_three_to_one_letter_code.keys()) for residue in residues)
+		if pymol_failed == True:
+			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Pymol PTM failed!,-\n")
+			return True	
 
 		# A. Chain A. I want to make it into chains C as before
 		apply_function_to_file(replace_chains, self.pdb_filename, chain_from="A", chain_to="C")
@@ -211,6 +224,8 @@ class Peptide(object):
 		merge_and_tidy_pdb([self.pdb_filename], PTMed_tidied)
 		copy_file(PTMed_tidied, self.pdb_filename)
 		remove_file(PTMed_tidied)
+
+		return False
 
 	def prepare_for_scoring(self, filestore, current_round, addH):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
