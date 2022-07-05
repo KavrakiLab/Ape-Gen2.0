@@ -323,7 +323,7 @@ def apegen(args):
 			if verbose: print("Preparing input for OpenMM optimization. This may take a while...")
 
 			# First prepare for OpenMM
-			arg_list = list(map(lambda e: (e, filestore, peptide, PTM_list, addH), successful_confs))
+			arg_list = list(map(lambda e: (e, filestore, peptide, addH), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(prepare_for_openmm, arg_list, progress_bar=verbose)
 
