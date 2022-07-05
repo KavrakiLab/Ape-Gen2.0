@@ -106,6 +106,9 @@ class pMHC(object):
 		for res in range(anchor_2 - template_peptide_len - 1, 1):	
 			pdb_df_peptide.loc[pdb_df_peptide['atom_number'].isin(atom_indexes[res]), 'residue_number'] = len(peptide.sequence) + res
 
+		# Filter out CBs when we have a Glycine (they shouldn't be there):
+		pdb_df_peptide = pdb_df_peptide[~((pdb_df_peptide['residue_name'] == 'GLY') and (pdb_df_peptide['atom_name'] == 'CB'))]
+
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
 		anchor_pdb = filestore + '/2_input_to_RCD/peptide.pdb'
