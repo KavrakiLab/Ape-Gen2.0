@@ -16,7 +16,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											replace_chains, remove_remarks_and_others_from_pdb,    \
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
-											verbose, extract_anchors
+											verbose, extract_anchors, count_number_of_atoms
 from classes.pMHC_class import pMHC
 
 from subprocess import call
@@ -231,7 +231,6 @@ class Peptide(object):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/04_pdbqt_peptides/peptide_" + str(self.index) + ".pdbqt"
 		clean = "lps" if addH == "all" else "nphs_lps"
-
 		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U " + clean + " -g -s > " + filestore + "/04_pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
 
 		# If the resulting .pdbqt is faulty, delete it. If it does not exist, it is also faulty, so skip whatever else. 
@@ -239,15 +238,16 @@ class Peptide(object):
 			seq = pdb_tofasta.run(open(self.pdbqt_filename, 'r'), multi=False)
 		except FileNotFoundError:
 			return True
-		seq = ''.join(seq).split("\n")[1]
-		if(len(seq) != len(self.sequence)):
-			#remove_file(self.pdbqt_filename)
+
+		number_1 = count_number_of_atoms(self.pdb_filename)
+		number_2 = count_number_of_atoms(self.pdbqt_filename)
+		if(number_1 != number_2):
+			remove_file(self.pdbqt_filename)
 			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
 				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
 		else:
 			return False
-
 
 	def dock_score_with_SMINA(self, filestore, receptor, addH):
 
