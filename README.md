@@ -52,9 +52,9 @@ and put them in the helper files folder, as these are mandatory for the anchor p
 For now, peptide sequence (along with phosphorylated positions) + HLA allotype works, but native + other types of inputs will follow:
 
 ```
-python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --debug
-python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --debug --score_with_openmm
-python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --debug --score_with_openmm
+python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --verbose
+python New_APE-Gen.py ARSEDEVILS HLA-A*11:01 --verbose --score_with_openmm
+python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ```
 
 ## TO-DOs:

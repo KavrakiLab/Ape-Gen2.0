@@ -215,7 +215,16 @@ def delete_elements(pdb_file, element_set, chains):
 				continue
 		yield line
 	fhandle.close()
-	   
+
+def count_number_of_atoms(pdb_file):
+	fhandle = open(pdb_file, 'r')
+	count = 0
+	for line in fhandle:
+		if line.startswith('ATOM'):
+			count +=1
+	fhandle.close()
+	return count
+
 def create_csv_from_list_of_files(csv_filename, list_of_files):
 	with open(csv_filename, 'wb') as outfile:
 		for filename in list_of_files:
