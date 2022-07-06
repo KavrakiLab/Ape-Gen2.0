@@ -100,7 +100,7 @@ class Peptide(object):
 				anchors = extract_anchors(self.sequence, receptor_allotype, frequencies)
 			else:
 				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
-				anchors = "2," + str(len(peptide_sequence))
+				anchors = "2," + str(sequence_length)
 
 		if verbose(): print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, self.sequence)
