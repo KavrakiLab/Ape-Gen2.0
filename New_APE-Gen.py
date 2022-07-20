@@ -149,7 +149,7 @@ def apegen(args):
 	# - Number of cores
 	num_cores = int(args.num_cores)
 
-	# - Number of loops on RCD (100 by default)
+	# - Number of loops to optimize (that will pass as a result of a loop scoring function)
 	num_loops = int(args.num_loops)
 
 	# - RCD dist tolerance: RCD tolerance (in angstroms) of inner residues when performing IK
@@ -198,6 +198,9 @@ def apegen(args):
 	# --addH: Adding hydrogens (all/polar only/no hydrogens)
 	addH = args.addH
 
+	# --loop_score: Choose scoring function for RCD loop scoring (none will avoid scoring altogether
+	loop_score = args.loop_score
+
 	# --cv: ONLY FOR TESTING (to be removed in the final version)
 	cv = args.cv
 
@@ -242,7 +245,8 @@ def apegen(args):
 	# B. Phosphorylation is on N-terminus or C-terminus. FF parameters are not given for these cases.
 	# C. User wants to model with no hydrogens involved, but also run an energy minimization routine. 
 	#    From my understanding, PDBFixer when given an MHC with no hydrogens will mess smth up not in terms of atoms, but in terms of bonds. 
-	#    Let's prevent users from actually doing this. 
+	#    Let's prevent users from actually doing this.
+	# D. If the number of loops is more than 5000, we should remove possibility from modelling (and this I guess can be manually overriden) 
 	if(addH == 'none') and (score_with_openmm == True):
 		sys.exit("\nTo use the openMM energy minimization routine, you need to provide polar/all hydrogens input.")
 	if (('phosphorylate 1' in PTM_list) or ('phosphorylate ' + str(len(peptide.sequence)) in PTM_list)) and (score_with_openmm):
@@ -250,7 +254,12 @@ def apegen(args):
 	for PTM in PTM_list:
 		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):
 			sys.exit("\nERROR: PTM other than phosphorylation is not yet supported with OpenMM. Omit the OpenMM step and stay tuned for changes!")
-
+	if loop_score != 'none':
+		rcd_num_loops = 5000 # Parameter that might potentially change
+		if num_loops > rcd_num_loops:
+			sys.exit("\nERROR: The number of total loops should not exceed 5000! PMHC modelling will just be too slow...")
+	else:
+		rcd_num_loops = num_loops
 	# 2. MAIN LOOP
 	current_round = 1
 	while current_round < num_rounds + 1:
@@ -270,7 +279,7 @@ def apegen(args):
 
 		# Perform RCD on the receptor given peptide:
 		if verbose: print("Performing RCD")
-		receptor_template.RCD(peptide, RCD_dist_tol, num_loops, filestore)
+		loop_indexes = receptor_template.RCD(peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore)
 
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
@@ -289,7 +298,7 @@ def apegen(args):
 
 		
 		arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
-						range(1, num_loops + 1)))
+						loop_indexes))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
 
