@@ -8,7 +8,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain, pdb_rplchain
+from pdbtools import pdb_merge, pdb_tidy, pdb_reatom, pdb_sort, pdb_selchain, pdb_rplchain, pdb_selmodel
 from Bio.Align import substitution_matrices
 
 from constraint import *
@@ -159,6 +159,12 @@ def rename_chains(pdb_filename, chain_from, chain_to, dst):
 	renamed = pdb_rplchain.run(open(pdb_filename, 'r'), (chain_from, chain_to))
 	with open(dst, 'w') as file:
 		file.write(''.join(renamed))
+	file.close()
+
+def select_models(pdb_filename, best_indexes, dst):
+	selected = pdb_selmodel.run(open(pdb_filename, 'r'), model_set=best_indexes)
+	with open(dst, 'w') as file:
+		file.write(''.join(selected))
 	file.close()
 
 def split_receptor_and_peptide(pdb_file):

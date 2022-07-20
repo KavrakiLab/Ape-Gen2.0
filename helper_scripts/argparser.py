@@ -6,7 +6,7 @@ def APE_Gen_parser():
 	parser.add_argument('peptide_input', type=str, nargs=1, help='Sequence of peptide to dock or pdbfile of crystal structure')
 	parser.add_argument('receptor_class', type=str, nargs=1, help='Class descriptor of MHC receptor. Use REDOCK along with crystal input to perform redocking. Or pass a PDB file with receptor')
 	parser.add_argument("-n", "--num_cores", type=int, default=8, help='Number of cores to use for RCD and smina computations.')
-	parser.add_argument("-l", "--num_loops", type=int, default=100, help='Number of loops to generate with RCD. (Note that the final number of sampled conformations may be less due to steric clashes.')
+	parser.add_argument("-l", "--num_loops", type=int, default=100, help='Number of loops to optimize (that will pass as a result of a loop scoring function)')
 	parser.add_argument("-t", "--RCD_dist_tol", type=float, default=1.0, help='RCD tolerance (in angstroms) of inner residues when performing IK')
 	parser.add_argument("-r", "--rigid_receptor", action="store_true", help='Disable sampling of receptor degrees of freedom specified in flex_res.txt')
 	parser.add_argument("-v", "--verbose", action="store_true", help='Print extra information for debugging')
@@ -24,4 +24,5 @@ def APE_Gen_parser():
 	parser.add_argument("--anchor_selection", type=str, default='secondary', choices=['primary', 'secondary', 'none'], help="Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)")
 	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
 	parser.add_argument("--addH", type=str, default='all', choices=['all', 'polar', 'none'], help='Adding hydrogens (all/polar only/no hydrogens)')
+	parser.add_argument("--loop_score", type=str, default='KORP', choices=['KORP', 'ICOSA', 'none'], help='Choose scoring function for RCD loop scoring (none will avoid scoring altogether)')
 	return parser

@@ -3,13 +3,13 @@ import pymol2
 from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir,	   \
 											move_batch_of_files, merge_and_tidy_pdb,			   \
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
-											merge_connect_fields, verbose
+											merge_connect_fields, select_models, move_file, remove_file, verbose
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
 import numpy as np
 
-from pdbtools import pdb_splitmodel
+from pdbtools import pdb_splitmodel, pdb_selmodel
 
 from subprocess import call
 import shutil
@@ -136,9 +136,10 @@ class pMHC(object):
 							records=['ATOM'], gz=False, append_newline=True)
 		# DONE!
 
-	def RCD(self, peptide, RCD_dist_tol, num_loops, filestore):
+	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore):
 		
 		initialize_dir(filestore + '/3_RCD_data')
+		pwd = os.getcwd()
 
 		# Create loops.txt file
 		os.chdir(filestore + "/2_input_to_RCD/")
@@ -151,19 +152,36 @@ class pMHC(object):
 		loops.close()
 
 		# Call RCD
-		call(["rcd -e 1 -x ../../../RCD_required_files/dunbrack.bin --energy_file ../../../RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1"], shell=True)
+		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1"], shell=True)
 
 		# Move files to back to destination folder
 		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_")
 		move_batch_of_files('./', '../3_RCD_data/', query="results")
 		os.chdir("../3_RCD_data/")
 
+		# Score loops if the user wants it to
+		if verbose(): print("RCD done!")
+		if loop_score != 'none':
+			if verbose(): print("Scoring loops with " + loop_score + "...")
+			loop_score_to_korpe = {'KORP' : '5', 'ICOSA' : '1'}
+			loop_score_to_korpe = loop_score_to_korpe[loop_score]
+			file_for_korpe = {'KORP' : 'korp6Dv1.bin', 'ICOSA' : 'loco.score'}
+			file_for_korpe = file_for_korpe[loop_score]
+			call([pwd + "/RCD_required_files/korpe ../2_input_to_RCD/anchored_pMHC.pdb --loops anchored_pMHC_closed.pdb --score_file " + pwd + "/RCD_required_files/" + file_for_korpe + " -e " + loop_score_to_korpe + " -o korp_res >> korp.log 2>&1 && awk '{$1=$1};1' korp_res.txt > korp_tmp.txt && mv korp_tmp.txt korp_res.txt"], shell=True)
+			korp_res = pd.read_csv("korp_res.txt", sep = " ")
+			best_indexes = korp_res[korp_res['#loop'] != 0].sort_values(by=['Energy'])['#loop'].head(num_loops).tolist()
+			select_models("./anchored_pMHC_closed.pdb", best_indexes , "./anchored_pMHC_closed_temp.pdb")
+			move_file("./anchored_pMHC_closed_temp.pdb", "./anchored_pMHC_closed.pdb")
+		else:
+			best_indexes = list(range(1, rcd_num_loops + 1))
+
 		# Split the output into files, as the output .pdb has many models			   
 		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_closed.pdb"]), outname="model")
 		initialize_dir('./splits')
 		move_batch_of_files('./', './splits', query="model")
-		os.chdir("../../../")
-		# DONE!
+		os.chdir(pwd)
+		
+		return best_indexes
 
 	def set_anchor_xyz(self, anchor_selection, peptide):
 
