@@ -90,6 +90,11 @@ ADD . $HOME/data/
 
 WORKDIR /data
 
+RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp | grep Korp6Dv1.txz |grep uk-button | cut -f4 -d\"` | tar Jxf - && \
+    cp ./Korp6Dv1/bin/korpe ./RCD_required_files/korpe && \
+    cp ./Korp6Dv1/korp6Dv1.bin ./RCD_required_files/korp6Dv1.bin && \
+    rm -r ./Korp6Dv1
+
 ENTRYPOINT ["bash"]
 
 # # Build this Dockerfile into an image by getting to the Dockerfile dir and executing:
