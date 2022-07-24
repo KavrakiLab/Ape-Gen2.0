@@ -62,7 +62,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Use statistical potential to rank/filter loops, now we are taking 100 random ones literally.
+- `successful_conformations_statistics.csv` correction to `successfull`
 - Rethink `PTM_list` (corrections are probably very minor)
 - Eventually prune image space by removing unwanted packages from `environment.yml`
 - Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc.
