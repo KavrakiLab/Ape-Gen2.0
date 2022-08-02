@@ -279,7 +279,10 @@ def apegen(args):
 
 		# Perform RCD on the receptor given peptide:
 		if verbose: print("Performing RCD")
-		loop_indexes = receptor_template.RCD(peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore)
+		# loop_indexes = receptor_template.RCD(peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore)
+		receptor_template.RCD(peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore)
+
+
 
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
@@ -297,17 +300,18 @@ def apegen(args):
 		initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
 
 		
+		# arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
+		# 				loop_indexes))
 		arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
-						loop_indexes))
+						range(1, num_loops + 1)))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
 
 		# Code for non-parallel execution and debugging
-
-		#for argument in arg_list:
-		#    print(argument)
-		#    peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7], argument[8])
-
+		# for argument in arg_list:
+		# 	print(argument)
+		# 	peptide_refinement_and_scoring(argument[0], argument[1], argument[2], argument[3], argument[4], argument[5], argument[6], argument[7], argument[8])
+		
 		# Print and keep statistics
 		best_conf_dir = filestore + '/4_SMINA_data'
 		if verbose: print("\n\nEnd of main workflow of round no. " + str(current_round) + "!!!")

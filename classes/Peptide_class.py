@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
+from constraint import *
+
 from biopandas.pdb import PandasPdb
 from Bio import Align
 
@@ -14,9 +16,11 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											rev_anchor_dictionary, all_three_to_one_letter_codes,  \
 											move_file, copy_file, merge_and_tidy_pdb,              \
 											replace_chains, remove_remarks_and_others_from_pdb,    \
-											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
+											delete_elements, extract_CONECT_from_pdb, 			   \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
-											verbose, extract_anchors, count_number_of_atoms
+											verbose, extract_anchors, count_number_of_atoms,	   \
+											constraint_dict_noH, constraint_dict_withH, atom_dict_noH, \
+											atom_dict_withH
 from classes.pMHC_class import pMHC
 
 from subprocess import call
@@ -24,6 +28,16 @@ from subprocess import call
 from pdbtools import pdb_tofasta, pdb_delelem
 
 from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
+
+class FlexibleResidue(object):
+	def __init__(self, residue_number):
+		self.number = residue_number
+		self.name = ""
+		self.pdb_file = ""
+		self.atom_indices = []
+		self.edges = []
+		self.CA_loc = -1
+		self.C_loc = -1
 
 class Peptide(object):
 
@@ -346,6 +360,7 @@ class Peptide(object):
 		# Alternative scenario as makeflex.py is probably unstable: Solve the CSP using the CONECT fields to determine the true identity of the atoms
 
 		# Making the CONECT list first:
+
 		edge_list = extract_CONECT_from_pdb(filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb")
 
 		original_ppdb = PandasPdb()
@@ -356,31 +371,37 @@ class Peptide(object):
 		flexible_ppdb.read_pdb(filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb")
 		flexible_pdb_df = flexible_ppdb.df['ATOM']
 
-		# Main Routine: For each flexible residue, solve the CSP and rename the atoms based on the CONECT fields
-		flexible_residues = pd.unique(flexible_pdb_df['residue_number'])
+		flexible_residue_groups = flexible_pdb_df.groupby('residue_number').groups
+		flexible_residue_numbers = flexible_residue_groups.keys()
+
+		reduced_original_pdb_df = original_pdb_df[(original_pdb_df['residue_number'].isin(flexible_residue_numbers)) & (original_pdb_df['chain_id'] == 'A')].copy()
+
+		all_CA_coords = original_pdb_df[(original_pdb_df['residue_number'].isin(flexible_residue_numbers)) & (original_pdb_df['atom_name'] == 'CA') & (original_pdb_df['chain_id'] == 'A')][['residue_number', 'x_coord', 'y_coord', 'z_coord']].copy()
+		all_C_coords = original_pdb_df[(original_pdb_df['residue_number'].isin(flexible_residue_numbers)) & (original_pdb_df['atom_name'] == 'C') & (original_pdb_df['chain_id'] == 'A')][['residue_number', 'x_coord', 'y_coord', 'z_coord']].copy()
+
 		list_of_dataframes = []
-		for flex_residue in flexible_residues:
-			sub_origin_pdb = original_pdb_df[(original_pdb_df['residue_number'] == flex_residue) & (original_pdb_df['chain_id'] == 'A')].copy()
-			sub_pdb = flexible_pdb_df[flexible_pdb_df['residue_number'] == flex_residue].copy()
-			atom_indexes = sub_pdb['atom_number'].tolist()
-			sub_edge_list = [elem for elem in edge_list if ((elem[0] in atom_indexes) and (elem[1] in atom_indexes))]
-			residue = (sub_pdb['residue_name'].tolist())[0]
+		for res_num in flexible_residue_groups:
+			curr_res = FlexibleResidue(res_num)
+			db_indices = flexible_residue_groups[res_num]
+			curr_res.atom_indices = [x + 1 for x in db_indices]
+			curr_res.pdb_file = flexible_pdb_df.iloc[db_indices[0] : db_indices[-1] + 1]
+			curr_res.name = curr_res.pdb_file.iloc[0]['residue_name']
+			curr_res.edges = [elem for elem in edge_list if ((elem[0] in curr_res.atom_indices) and (elem[1] in curr_res.atom_indices))]
 
-			# Remember that CA and C are in the backbone, and are not moving at all, so their co-ordinates will be the same
-			# CA location
-			CA_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'CA'][['x_coord', 'y_coord', 'z_coord']])
-			loc_indexes = np.all(np.isclose(CA_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
+			orig_CA_coords = all_CA_coords[all_CA_coords['residue_number'] == res_num][['x_coord', 'y_coord', 'z_coord']]		
+			flex_CA_coords = np.array(curr_res.pdb_file[['x_coord', 'y_coord', 'z_coord']])
+			CA_loc_indexes = np.all(np.isclose(orig_CA_coords, flex_CA_coords, 
 										  rtol=1e-05, atol=1e-08, equal_nan=False), axis=1)
-			CA_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
+			curr_res.CA_loc = (curr_res.pdb_file.loc[CA_loc_indexes, 'atom_number'].values)[0]
 
-			# C location
-			C_coords = np.array(sub_origin_pdb[sub_origin_pdb['atom_name'] == 'C'][['x_coord', 'y_coord', 'z_coord']])
-			loc_indexes = np.all(np.isclose(C_coords, np.array(sub_pdb[['x_coord', 'y_coord', 'z_coord']]), 
+			orig_C_coords = all_C_coords[all_C_coords['residue_number'] == res_num][['x_coord', 'y_coord', 'z_coord']]
+			flex_C_coords = np.array(curr_res.pdb_file[['x_coord', 'y_coord', 'z_coord']])
+			C_loc_indexes = np.all(np.isclose(orig_C_coords, flex_C_coords, 
 										  rtol=1e-05, atol=1e-08, equal_nan=False), axis=1)
-			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
+			curr_res.C_loc = (curr_res.pdb_file.loc[C_loc_indexes, 'atom_number'].values)[0]
 
-			# print(CA_loc, C_loc)
-			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc, addH)
+
+			matching = csp_solver(curr_res, addH)
 			# print(matching)
 			# input()
 			if matching.shape[0] == 0: # Empty Solution
@@ -390,8 +411,8 @@ class Peptide(object):
 					flexible_log.write(str(current_round) + "," + str(self.index) + ",Flexible receptor conformation received was faulty,-\n") 
 				return True
 
-			sub_pdb = sub_pdb.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
-			list_of_dataframes.append(sub_pdb)  
+			curr_res.pdb_file = curr_res.pdb_file.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
+			list_of_dataframes.append(curr_res.pdb_file)  
 
 		# When done, bring the .pdb file columns to the appropriate order
 		renamed_atoms = pd.concat(list_of_dataframes)
@@ -400,7 +421,7 @@ class Peptide(object):
 
 		# Unify the original file with the flexible one
 		flexible_ppdb.df['ATOM'] = renamed_atoms.copy()
-		original_ppdb.df['ATOM'] = original_pdb_df[(~(original_pdb_df['residue_number'].isin(flexible_residues))) | (original_pdb_df['atom_name'].isin(["N", "O", "H"]))]
+		original_ppdb.df['ATOM'] = original_pdb_df[(~(original_pdb_df['residue_number'].isin(flexible_residue_numbers))) | (reduced_original_pdb_df['atom_name'].isin(["N", "O", "H"]))]
 		original_ppdb.to_pdb(path=filestore + "/temp_" + str(self.index) + ".pdb", records=['ATOM'], gz=False, append_newline=True)
 		flexible_ppdb.to_pdb(path=filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb", records=['ATOM'], gz=False, append_newline=True)
 		minimized_receptor_loc = filestore + "/09_minimized_receptors/receptor_" + str(self.index) + ".pdb"
@@ -426,6 +447,44 @@ class Peptide(object):
 		merge_and_tidy_pdb([filestore + "/09_minimized_receptors/receptor_" + str(self.index) + ".pdb", 
 							self.pdb_filename], pMHC_complex)
 
+
+## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
+
+def csp_solver(residue, addH):
+	res_name = residue.name
+	# Note to change the 4-letter atoms if need be!
+	if addH != "none":
+		atom_dict = atom_dict_withH
+		constraint_dict = constraint_dict_withH
+		
+	else:
+		atom_dict = atom_dict_noH
+		constraint_dict = constraint_dict_noH
+
+	no_of_cases = len(atom_dict[res_name])
+	for i in range(no_of_cases):
+		# Formulating the atom matching problem as a CSP:
+		problem = Problem()
+
+		# Adding atoms as variables to the CSP (along with possible index values they can take (CA and C are known):
+		problem.addVariable("CA", [residue.CA_loc])
+		problem.addVariable("C", [residue.C_loc])
+		problem.addVariables((atom_dict[res_name][i])[2:], residue.atom_indices)
+
+		# Adding Constraints to the CSP
+		# 1. No atoms share the same index
+		problem.addConstraint(AllDifferentConstraint())
+
+		# 2. Topological constraints that are associated with each residue:
+		for elem in constraint_dict[res_name][i]:
+			problem.addConstraint(lambda a, b: ([a,b] in residue.edges) and ([b,a] in residue.edges), elem)
+
+		# 3. Find problem solution
+		if len(problem.getSolutions()) > 0:
+			solution = problem.getSolutions()[0]
+			return pd.DataFrame(data={'atom_name': solution.keys(), 'atom_number': list(solution.values())})
+
+	return pd.DataFrame(data={})
 
 def AA_error_checking(amino_acid):
 	if (amino_acid not in standard_three_to_one_letter_code.values()) and (amino_acid not in non_standard_three_to_one_letter_code.values()):
