@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+from math import copysign
 
 from biopandas.pdb import PandasPdb
+
 from Bio import Align
 
 import sys
@@ -16,7 +18,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											replace_chains, remove_remarks_and_others_from_pdb,    \
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
-											verbose, extract_anchors, count_number_of_atoms
+											verbose, extract_anchors, count_number_of_atoms, score_sequences
 from classes.pMHC_class import pMHC
 
 from subprocess import call
@@ -36,7 +38,21 @@ class Peptide(object):
 		self.secondary_anchors = secondary_anchors
 		self.index = index
 
-
+	@classmethod
+	def init_peptide(cls, peptide_input):
+		if verbose(): print("Processing Peptide Input")
+		if peptide_input.endswith(".pdb"):
+			# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
+			# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
+			# TODO: should anchors be set from arguments?
+			#	fromPDB is only for redocking?
+			#	is there never an instance where the input will only be chain C? 
+			return Peptide.frompdb(peptide_input, anchors="")
+		else:
+			# Fetch template from peptide template list
+			peptide_sequence_noPTM, peptide_PTM_list = PTM_processing(peptide_input)
+			return cls(sequence=peptide_sequence_noPTM, PTM_list=peptide_PTM_list)
+	
 	@classmethod
 	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, peptide_index=-1):
 		# Initialize peptide from a .pdb file
@@ -55,33 +71,15 @@ class Peptide(object):
 			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
 		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
 
-	@classmethod
-	def init_peptide(cls, peptide_input):
-		if verbose(): print("Processing Peptide Input")
-		if peptide_input.endswith(".pdb"):
-			# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
-			# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
-			# TODO: should anchors be set from arguments?
-			#	fromPDB is only for redocking?
-			#	is there never an instance where the input will only be chain C? 
-			return Peptide.frompdb(peptide_input, anchors="")
-		else:
-			# Fetch template from peptide template list
-			# peptide = Peptide.fromsequence(peptide_input)
-			# peptide, template_anchors = Peptide.fromsequence(peptide_input, receptor.allotype, anchors)
-			peptide_sequence_noPTM, peptide_PTM_list = PTM_processing(peptide_input)
-			return cls(sequence=peptide_sequence_noPTM, PTM_list=peptide_PTM_list)
-	
-
 	def get_peptide_template(self, receptor_allotype, anchors, anchor_selection, cv=''):
 
-		# Current policy of selecting/chosing peptide templates is:
 		sequence_length = len(self.sequence)
 		templates = pd.read_csv("./helper_files/Updated_template_information.csv") # Fetch template info
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 		# removes pdb code of peptide in order to cross validate (just for testing)
 
+		# Current policy of selecting/chosing peptide templates is:
 		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
 		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
 		# (maybe play with user input for now?)
@@ -104,14 +102,18 @@ class Peptide(object):
 
 		if verbose(): print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, self.sequence)
-		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
-		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(",")).apply(set) # Convert the column into a set, and do set distances
-		
-		# Choosing the major anchors as template choosing mechanism (secondary anchors are way to complicated)
-		templates['jaccard_distance'] = templates['Major_anchor_not'].apply(lambda x: jaccard_distance(x, anchors_not))
-		templates = templates[templates['jaccard_distance'] == templates['jaccard_distance'].max()].dropna()
+		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(","))
+		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(","))
+
+		# Bring the templates having same anchor distance as the give peptide-MHC (NOTE: Calculate this offline as an improvement?)
+		int_anchors = [int(pos) for pos in anchors.split(",")]
+		diff = abs(int_anchors[0] - int_anchors[1]) 
+		templates['anchor_diff'] = templates['Major_anchors'].apply(lambda x: x.split(","))
+		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
+		templates = templates[templates['anchor_diff'] == diff]
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
+		# But what if the motifs are not known?
 		sub_alleles = pd.unique(templates['MHC']).tolist()
 		sub_alleles.append("Allele")
 		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
@@ -120,74 +122,65 @@ class Peptide(object):
 
 		templates = templates[templates['MHC'] == similar_alleles]
 
-		# 3) Select the one that is closer in terms of anchor residues
-		peptide_anchor_sequence = self.sequence[:2] + self.sequence[(sequence_length - 2):]
-		template_anchor_sequences = (templates['peptide'].str[:2] + templates['peptide'].str[(sequence_length - 2):]).tolist()
-		aligner = Align.PairwiseAligner()
-		aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
-		score_list = []
-		for template_anchor_sequence in template_anchor_sequences:
-			score_list.append(aligner.score(peptide_anchor_sequence, template_anchor_sequence))
-		templates['anchor_score'] = score_list
-		templates = templates[templates['anchor_score'] == templates['anchor_score'].max()].dropna()
+		templates['Major_anchor_1'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[0].astype(int)
+		templates['Major_anchor_2'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[1].astype(int)
+		templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
+		templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
 
-		# 4) If there are duplicate results, select the one closer to the whole sequence
+		# 3) Select the template that is the closest in terms of sequence:
+		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
-		aligner.open_gap_score = -0.5
-		aligner.extend_gap_score = -0.5
-		for template_sequence in template_sequences:
-			score_list.append(aligner.score(self.sequence, template_sequence))
-		templates['peptide_score'] = score_list
-		templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
+		Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
+		Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
+		for i, template_sequence in enumerate(template_sequences):
+			extra_in_beginning = ''.join('-'*abs(Anchor_diff_1[i]))
+			extra_in_end = ''.join('-'*abs(Anchor_diff_2[i]))
+			if Anchor_diff_1[i] > 0:
+				temp_sequence_in_question = extra_in_beginning + self.sequence
+				temp_template_sequence = template_sequence
+			else:
+				temp_sequence_in_question = self.sequence
+				temp_template_sequence = extra_in_beginning + template_sequence
+			if Anchor_diff_2[i] > 0:
+				temp_sequence_in_question = temp_sequence_in_question + extra_in_end
+			else:
+				temp_template_sequence = temp_template_sequence + extra_in_end
+			score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
+											  matrix=blosum_62, gap_penalty=0))
+		templates['similarity_score'] = score_list
+		templates = templates[templates['similarity_score'] == templates['similarity_score'].max()].dropna()
 
-		# 5) If there are duplicate results, select at random!
+		# 4) If there are duplicate results, select at one at random!
 		final_selection = templates.sample(n=1)
 		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
-		# 6) Extract the anchor position numbers for the anchor tolerance step!
+		# 5) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
 		template_major_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Major_anchor_not'].values[0])])
 		template_secondary_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 		peptide_primary_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchors_not])
 		peptide_second_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 
-		# 7) Define the peptide template object
+		# 6) Secondary anchors adjustment!
+		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
+		peptide_second_anchors = [int(anchor) - Anchor_diff_1 for anchor in peptide_second_anchors]
+
+		# Filtering secondary anchors that won't make sense give the left/right tilt
+		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor < sequence_length]
+
+		# 6) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
 														  primary_anchors=template_major_anchors,
 														  secondary_anchors=template_secondary_anchors))
 
-		# 8) Return both the peptide object, as well as the peptide template that was chosen
+		# 7) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
 		self.primary_anchors = peptide_primary_anchors 
 		self.secondary_anchors = peptide_second_anchors
 		return peptide_template
-
-	# def add_sidechains(self, filestore):
-	# 	fixer = PDBFixer(filename=self.pdb_filename)
-	# 	fixer.findMissingResidues()
-	# 	fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
-	# 	fixer.findMissingAtoms()
-	# 	fixer.addMissingAtoms()
-	# 	fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-	# 	#fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
-	# 	self.pdb_filename = filestore + '/02_add_sidechains/PTMed_' + str(self.index) + '.pdb'
-	# 	PDBFile.writeFile(fixer.topology, fixer.positions, open(self.pdb_filename, 'w'))
-
-	# 	# So my hypothesis now here is that Modeller that is being used to add hydrogens, has a specification
-	# 	# in its file, hydrogens.xml, that adds a methyl group of H2 and H3 (as well as the OXT) that really mess up prepare_ligard4.py.
-	# 	# Let's delete those entries and see how this goes:
-	# 	# UPDATE: It's probably not this, uncomment if necessary
-	# 	#delete_modeller_hydrogens = delete_elements(self.pdb_filename, ["H2", "H3", "OXT"])
-	# 	#overwritten = ''.join(delete_modeller_hydrogens)
-	# 	#with open(self.pdb_filename, 'w') as PTMed_file:
-	# 	#	PTMed_file.write(overwritten)
-
-	# 	# Before finishing, also copy the file to the PTM floder, as the process is going to be self-referential (same input output for the PTM)
-	# 	copy_file(filestore + '/02_add_sidechains/PTMed_' + str(self.index) + '.pdb', 
-	# 						filestore + '/03_PTMed_peptides/PTMed_' + str(self.index) + '.pdb')
 
 	def perform_PTM(self, filestore, current_round):
 
@@ -435,20 +428,15 @@ def AA_error_checking(amino_acid):
 def process_anchors(anchors, pep_seq):
 	# Returns the set of anchors
 	pep_length = len(re.sub('[a-z]', '', pep_seq)) # Remove any PTMs that may still exist in the sequence
-	anchor_not = set([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")])
+	anchor_not = sorted(list([anchor_dictionary[str(pep_length)][str(aa_index)] for aa_index in anchors.split(",")]))
 	return anchor_not
-
-def jaccard_distance(a, b):
-	# Computes jaccard distance between 2 sets
-	c = a.intersection(b)
-	return float(len(c)) / (len(a) + len(b) - len(c))
 
 ## PTMs
 
 # Different PTMs
 
 phosphorylation_list = ['pS', 'pT', 'pY']
-acetylation_list = ['aK'] # Check details on pytms -> This is nmot working well, it renames all hydrogens to PyMOL ones
+acetylation_list = ['aK'] # Check details on pytms -> This is not working well, it renames all hydrogens to PyMOL ones
 carbamylation_list = ['cK'] # Check details on pytms
 citrullination_list = ['cR'] 
 methylation_list = ['mmK', 'mdK', 'mtK'] # Check details on pytms

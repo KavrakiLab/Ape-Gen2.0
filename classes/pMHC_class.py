@@ -3,11 +3,13 @@ import pymol2
 from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, initialize_dir,	   \
 											move_batch_of_files, merge_and_tidy_pdb,			   \
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
-											merge_connect_fields, select_models, move_file, remove_file, verbose
+											merge_connect_fields, select_models, move_file, 	   \
+											remove_file, verbose, add_missing_residues
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
 import numpy as np
+import random
 
 from pdbtools import pdb_splitmodel, pdb_selmodel
 
@@ -136,6 +138,94 @@ class pMHC(object):
 							records=['ATOM'], gz=False, append_newline=True)
 		# DONE!
 
+	def prepare_for_RCD_v2(self, reference, peptide, filestore):
+
+		# Function that prepares files for performing RCD:
+		# 1. It replaces the amino acids of the template by the ones from the peptide that we want to model
+		# 2. It deletes amino acids from the peptide template that do not correspond to any aas from the peptide we want to model due to the tilt
+		# 3. It adds amino acids that were not replaced due again to the tilt. 
+
+		initialize_dir(filestore + '/2_input_to_RCD')
+
+		# 1. Delete the peptide from the receptor template:
+		ppdb_receptor = PandasPdb()
+		ppdb_receptor.read_pdb(self.pdb_filename)
+		pdb_df_receptor = ppdb_receptor.df['ATOM']
+		ppdb_receptor.df['ATOM'] = ppdb_receptor.df['ATOM'][ppdb_receptor.df['ATOM']['chain_id'] != 'C']
+		self.pdb_filename = filestore + '/2_input_to_RCD/receptor.pdb'
+		ppdb_receptor.to_pdb(path=self.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
+
+		# 2. Secondly, keep the anchors and the backbone from the peptide pdb
+		ppdb_peptide = PandasPdb()
+		ppdb_peptide.read_pdb(reference.pdb_filename)
+		pdb_df_peptide = ppdb_peptide.df['ATOM']
+
+		# Only peptide
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
+
+		# RCD config -> I think I must include this for residue replacement to work and for no other reason
+		# These are also the atoms that I am playing with in RCD (I don't need any others)
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'].isin(['N', 'CA', 'C', 'O', 'CB'])]
+
+		# 1. Here, I am replacing the (anchor) residues of the template peptide with the residues of the given peptide.
+		anchor_1_ref = reference.peptide.primary_anchors[0]
+		anchor_2_ref = reference.peptide.primary_anchors[1]
+		anchor_1_pep = peptide.primary_anchors[0]
+		anchor_2_pep = peptide.primary_anchors[1]
+		anchor_1_diff = anchor_1_ref - anchor_1_pep
+		anchor_2_diff = anchor_2_ref - anchor_2_pep
+		for res in range(anchor_1_ref, anchor_2_ref + 1):
+			pdb_df_peptide.loc[pdb_df_peptide['residue_number'] == res, 'residue_name'] = all_one_to_three_letter_codes[peptide.sequence[res - anchor_1_diff - 1]]
+
+		# 2. Here, I am deleting the anchor residues from the peptide template that do not correspond to any aas from the peptide we want to model due to the tilt
+		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
+									    (pdb_df_peptide['residue_number'] < anchor_2_diff + len(peptide.sequence))]
+		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
+
+		# Store the peptide now:
+		ppdb_peptide.df['ATOM'] = pdb_df_peptide
+		anchor_pdb = filestore + '/2_input_to_RCD/2_peptide_del.pdb'
+		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
+
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/2_anchored_pMHC_del.pdb'
+		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
+
+		# 3. Here, I am adding the extra amino acids that were not replaced due to the tilt. 
+		# I need to manually add the SEQRES field on top of the file, in order for PDBFixer to know where to put the residues. 
+
+		# First attempt:
+		seqres_pdb = filestore + '/2_input_to_RCD/seqres.pdb'
+		three_letter_list = [all_one_to_three_letter_codes[aa] for aa in list(peptide.sequence)]
+		if len(three_letter_list) <= 9:
+			three_letter_string = ' '.join(three_letter_list)
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C    " + str(len(three_letter_list)) + "  " + three_letter_string)
+			seqres.close()
+		elif len(three_letter_list) <= 13:
+			three_letter_string = ' '.join(three_letter_list)
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string)
+			seqres.close()
+		else:
+			three_letter_string_1 = ' '.join(three_letter_list[:13])
+			three_letter_string_2 = ' '.join(three_letter_list[13:])
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string_1)
+				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
+			seqres.close()
+
+		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/2_anchored_pMHC_del_seqres.pdb'
+		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
+
+		# Now I guess I can try adding the extra amino acids with PDBFixer:
+		add_missing_residues(anchored_MHC_file_name_seqres, filestore)
+
+		# Now I need to re-filter them, haha, yay
+		# Thoughts: What if I do it with PDBFixer mutations instead? That would save potentially many troubles
+		# If not, maybe I can add the extras before I do anything, and then do the filtering and the replacement.
+		
+		input()
+
 	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore):
 		
 		initialize_dir(filestore + '/3_RCD_data')
@@ -152,28 +242,23 @@ class pMHC(object):
 		loops.close()
 
 		# Call RCD
-		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1"], shell=True)
+		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_rmsd.txt"], shell=True)
 
 		# Move files to back to destination folder
 		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_")
 		move_batch_of_files('./', '../3_RCD_data/', query="results")
 		os.chdir("../3_RCD_data/")
+		input()
 
+		korp_res = pd.read_csv("anchored_pMHC_rmsd.txt", sep = " ")
+		if loop_score in ['KORP', 'ICOSA']:
+			best_indexes = korp_res.sort_values(by=['Energy'])['#loop'].head(num_loops).tolist()
+		elif loop_score == 'RMSD':
+			best_indexes = korp_res.sort_values(by=['RMSD'])['#loop'].head(num_loops).tolist()
+		else:
+			best_indexes = random.sample(range(rcd_num_loops), num_loops)
 		# Score loops if the user wants it to
 		if verbose(): print("RCD done!")
-		if loop_score != 'none':
-			if verbose(): print("Scoring loops with " + loop_score + "...")
-			loop_score_to_korpe = {'KORP' : '5', 'ICOSA' : '1'}
-			loop_score_to_korpe = loop_score_to_korpe[loop_score]
-			file_for_korpe = {'KORP' : 'korp6Dv1.bin', 'ICOSA' : 'loco.score'}
-			file_for_korpe = file_for_korpe[loop_score]
-			call([pwd + "/RCD_required_files/korpe ../2_input_to_RCD/anchored_pMHC.pdb --loops anchored_pMHC_closed.pdb --score_file " + pwd + "/RCD_required_files/" + file_for_korpe + " -e " + loop_score_to_korpe + " -o korp_res >> korp.log 2>&1 && awk '{$1=$1};1' korp_res.txt > korp_tmp.txt && mv korp_tmp.txt korp_res.txt"], shell=True)
-			korp_res = pd.read_csv("korp_res.txt", sep = " ")
-			best_indexes = korp_res[korp_res['#loop'] != 0].sort_values(by=['Energy'])['#loop'].head(num_loops).tolist()
-			select_models("./anchored_pMHC_closed.pdb", best_indexes , "./anchored_pMHC_closed_temp.pdb")
-			move_file("./anchored_pMHC_closed_temp.pdb", "./anchored_pMHC_closed.pdb")
-		else:
-			best_indexes = list(range(1, rcd_num_loops + 1))
 
 		# Split the output into files, as the output .pdb has many models			   
 		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_closed.pdb"]), outname="model")

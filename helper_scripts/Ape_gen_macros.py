@@ -136,9 +136,19 @@ def add_sidechains(pdb_filename, filestore, add_hydrogens, peptide_idx=-1, remov
 							filestore + '/03_PTMed_peptides/PTMed_' + str(peptide_idx) + '.pdb')
 	return pdb_filename
 
+def add_missing_residues(pdb_filename, filestore):
+	fixer = PDBFixer(filename=pdb_filename)
+	fixer.findMissingResidues()
+	fixer.findMissingAtoms()
+	fixer.addMissingAtoms()
+	fp = open(pdb_filename, 'w')
+	PDBFile.writeFile(fixer.topology, fixer.positions, fp, keepIds=True)
+	fp.close()
+	return pdb_filename
+
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
-	sorteded = pdb_sort.run(merged, sorting_keys='-RC') # Potentially breaking -> Not working?
+	sorteded = pdb_sort.run(merged, sorting_keys='-RC')
 	tidied = pdb_tidy.run(sorteded, strict=True)
 	reatomed = pdb_reatom.run(tidied, starting_value=1)
 	with open(dst, 'w') as pdb_file:
@@ -251,7 +261,12 @@ def pretty_print_analytics(csv_location, verbose=True):
 		print(results_csv.to_markdown(index=False))
 	return results_csv
 
-
+def score_sequences(seq1, seq2, matrix, gap_penalty):
+	score = 0
+	for A,B in zip(seq1,seq2):
+		diag = ('-'==A) or ('-'==B)
+		score += gap_penalty if diag else matrix[A,B]
+	return score
 
 
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT

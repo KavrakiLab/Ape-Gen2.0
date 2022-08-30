@@ -73,27 +73,29 @@ RUN conda install -c bioconda autodock-vina
 RUN pip install mpire
 RUN pip install pdb-tools
 
-# RCD
-RUN conda install -c intel mkl
-ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/conda/lib/"
-RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
-    cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin
-
 # Probably you should be cloning the directory if you want to build the image yourself?
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 ADD . $HOME/data/
+RUN mkdir -p $HOME/data/RCD_required_files
 
 # replace files that cause warnings and errors
 # COPY /replacement_files/replace_files.sh /replace_files.sh
 # RUN echo "sh /replace_files.sh" >> ~/.bashrc
 
+# RCD
+RUN conda install -c intel mkl
+ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/conda/lib/"
+RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
+    cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin && \
+    cp RCD_v1.40_Linux_20190228/korp6Dv1.bin $HOME/data/RCD_required_files/korp6Dv1.bin && \
+    cp RCD_v1.40_Linux_20190228/dunbrack.bin $HOME/data/RCD_required_files/dunbrack.bin
+
 WORKDIR /data
 
-RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp | grep Korp6Dv1.txz |grep uk-button | cut -f4 -d\"` | tar Jxf - && \
-    cp ./Korp6Dv1/bin/korpe ./RCD_required_files/korpe && \
-    cp ./Korp6Dv1/korp6Dv1.bin ./RCD_required_files/korp6Dv1.bin && \
-    rm -r ./Korp6Dv1
+#RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp | grep Korp6Dv1.txz #|grep uk-button | cut -f4 -d\"` | tar Jxf - && \
+#    cp ./Korp6Dv1/korp6Dv1.bin ./RCD_required_files/korp6Dv1.bin && \
+#    rm -r ./Korp6Dv1
 
 ENTRYPOINT ["bash"]
 

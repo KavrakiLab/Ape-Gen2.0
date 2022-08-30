@@ -179,7 +179,7 @@ class Receptor(object):
 		self.doMinimization = True
 		self.useSMINA = True
 
-	def init_receptor(receptor_class, file_storage, peptide_input):
+	def init_receptor(receptor_class, file_storage, peptide_input, cv=''):
 		if verbose(): print("Processing Receptor Input")
 
 		if receptor_class.endswith(".pdb"):
@@ -198,7 +198,7 @@ class Receptor(object):
 		else:
 			# If this is an allotype specification, fetch template like the peptide!
 			initialize_dir(file_storage + '/MODELLER_output')
-			receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage)
+			receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage, cv)
 			receptor_template_file = receptor.pdb_filename
 		return receptor, receptor_template_file
 
@@ -214,9 +214,6 @@ class Receptor(object):
 
 	@classmethod
 	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
-
-		# Pre-process: Remove any PTMs from the peptide sequence:
-		# peptide_sequence = re.sub('[a-z]', '', peptide_sequence) # Remove PTMs when fetching the template
 
 		# Check #1: Existing structures
 		templates = pd.read_csv("./helper_files/Updated_template_information.csv")
