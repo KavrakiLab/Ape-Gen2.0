@@ -149,11 +149,17 @@ def apegen(args):
 	# - Number of cores
 	num_cores = int(args.num_cores)
 
+	# - Number of loops to generate with RCD
+	rcd_num_loops = int(args.num_generated_loops)
+
 	# - Number of loops to optimize (that will pass as a result of a loop scoring function)
-	num_loops = int(args.num_loops)
+	num_loops = int(args.num_loops_for_optimization)
 
 	# - RCD dist tolerance: RCD tolerance (in angstroms) of inner residues when performing IK
 	RCD_dist_tol = args.RCD_dist_tol
+
+	# --loop_score: Choose scoring function for RCD loop scoring (none will avoid scoring altogether)
+	loop_score = args.loop_score
 
 	# - rigid_receptor : Disable sampling of receptor DoFs in the flex_res.txt
 	doReceptorMinimization = not args.rigid_receptor
@@ -198,9 +204,6 @@ def apegen(args):
 	# --addH: Adding hydrogens (all/polar only/no hydrogens)
 	addH = args.addH
 
-	# --loop_score: Choose scoring function for RCD loop scoring (none will avoid scoring altogether
-	loop_score = args.loop_score
-
 	# --cv: ONLY FOR TESTING (to be removed in the final version)
 	cv = args.cv
 
@@ -212,7 +215,7 @@ def apegen(args):
 	peptide = Peptide.init_peptide(peptide_input)
 	PTM_list = peptide.PTM_list
 
-	receptor, receptor_template_file = Receptor.init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide.sequence)
+	receptor, receptor_template_file = Receptor.init_receptor(receptor_class, temp_files_storage +  '/MODELLER_output', peptide.sequence, cv)
 	receptor.doMinimization = doReceptorMinimization
 	receptor.useSMINA = min_with_smina
 	
@@ -254,12 +257,9 @@ def apegen(args):
 	for PTM in PTM_list:
 		if (not PTM.startswith("phosphorylate")) and (score_with_openmm):
 			sys.exit("\nERROR: PTM other than phosphorylation is not yet supported with OpenMM. Omit the OpenMM step and stay tuned for changes!")
-	if loop_score != 'none':
-		rcd_num_loops = 5000 # Parameter that might potentially change
-		if num_loops > rcd_num_loops:
-			sys.exit("\nERROR: The number of total loops should not exceed 5000! PMHC modelling will just be too slow...")
-	else:
-		rcd_num_loops = num_loops
+	if num_loops > rcd_num_loops:
+		sys.exit("\nERROR: The number of loops for post-processing should not exceed the number of loops that are generated!")
+
 	# 2. MAIN LOOP
 	current_round = 1
 	while current_round < num_rounds + 1:
@@ -274,7 +274,7 @@ def apegen(args):
 		if verbose: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference=peptide_template, filestore=filestore)
 		if verbose: print("Preparing input to RCD")
-		receptor_template.prepare_for_RCD(reference=peptide_template, peptide=peptide, filestore=filestore)
+		receptor_template.prepare_for_RCD_v2(reference=peptide_template, peptide=peptide, filestore=filestore)
 		add_sidechains(receptor_template.pdb_filename, filestore, addH, keep_IDs=True)
 
 		# Perform RCD on the receptor given peptide:
@@ -295,7 +295,6 @@ def apegen(args):
 						'/02_add_sidechains', '/04_pdbqt_peptides', '/06_scoring_results', '/07_flexible_receptors',
 						'/09_minimized_receptors', '/08_anchor_filtering', '/10_pMHC_complexes/']
 		initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
-
 		
 		arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
 						loop_indexes))
