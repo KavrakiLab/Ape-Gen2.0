@@ -84,7 +84,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Implement RMSD scoring in RCD. For that, the whole peptide template fetching and RCD preparation needs to be re-conceptualized and re-written from scratch...
 - Include the native backbone in the post-processing (at least when using the RMSD as a loop scoring mechanism)
 - Testing/Testing/Testing...
 
