@@ -62,32 +62,36 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Send an e-mail to Chacon lab for the RCD file that does not want to work
+- Wrap the anchor extraction/other things that can be wrapped in the Peptide/pMHC class from the initial part up to the RCD (but also in general) and put them in the macro file, they looks ugly.
+- Put a check so that if a peptide template with an MHC that is the same as the input allotype is found, don't bother fetching smth different, and just assign the same template as the receptor (that would require flipping the template selection order though). 
+- `_A`s and `_B`s need to go from the templates, I should be keeping only the As
+- I need to clean the dataframe fields. There are many that are basically useless, or I compute many while executing the algorithm, and pre-computation of those would be much better. 
+- Convert macros to the way they previously were, or make them class methods if they concern exclusively a class. 
 - `successful_conformations_statistics.csv` correction to `successfull`
-- Rethink `PTM_list` (corrections are probably very minor)
 - Eventually prune image space by removing unwanted packages from `environment.yml`
-- Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc.
+- Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc. (if possible)
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
-- Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina)
+- Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina).
 - Add `num_of_rounds` in homology modelling as an argument. 
-- Make function in the places where there is repeated code (there is one on peptide similarity tempalte selection)
+- Make function in the places where there is repeated code
 - Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
 - The `receptor_template_file` variable in Section 1b is questionable, investigate more
 - Consider peptide methods which receptor is an input to be transferred to the `pMHC_class`, and a pMHC object defined
 - REVISE `simtk.openmm` import warning coming from PDBFixer, wait for a new version or modify the .xml: https://github.com/openmm/pdbfixer/issues/233
-- REVISE Better folder names for intermediate results (it would be nice if they are numbered so that they are ordered nicely)
 - Function documentation needs to be done thouroughly at some point
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- `5TRZ.pdb` is the only peptide with non-canonical anchors in both positions. For those cases, bring 2 peptide templates, one for each position and combine them. 
-- Prepare the code for RMSD comparison with PANDORA paper.
+- Implement RMSD scoring in RCD. For that, the whole peptide template fetching and RCD preparation needs to be re-conceptualized and re-written from scratch...
+- Include the native backbone in the post-processing (at least when using the RMSD as a loop scoring mechanism)
 - Testing/Testing/Testing...
 
 ### PTMs:
 
 #### Major issues:
-- Implement other PTMs:
+- Implement other PTMs (DONE!):
 	- Already done:
 		- Phosphorylation
 		- Citrullination
@@ -98,12 +102,11 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 		- P-hydroxylation (non-biological 4S configuration not implemented)
 		- C-Oxidation (not the R variation in CSX)
 		- M-Oxidation (just the default variation)
-	- To Do:
 		- Nitration
 
 #### Minor issues:
 - Some PTMs are possible for any amino-acid in the N-termini. This has been observed, so future work can focus on adding this extra option. 
-- Malondialdehyde adducts is particularly complex, so I'll leave it for now. 
+- Malondialdehyde adducts is particularly complex, but maybe could be added in the future. 
 - Deamindation is not needed for now, but since it has been observed in pMHCs a lot, maybe implement it by expanding `pytms.py`
 - Some renaming on the extra hydrogens added by `pymol` will be necessary if we are to expand every PTM on openMM/GROMACS. 
 
@@ -123,7 +126,5 @@ This will probably happen with the new `openmmforcefields` release (when that ha
 ### Expansions:
 
 - GUI
-- Ensemble of receptor conformations in RCD step (maybe after that too?)
 - Extend to Class-II using the same principle
-- AlphaFold / RosettaTFold (wait for an API like thing) (could I also generate a bunch of HLAs offline and assess instead?)
-- Think about alternative scoring function? )and test it's RMSD to vindardo/vina/CNN)
+- Think about alternative scoring function? (and test it's RMSD to vindardo/vina/CNN)
