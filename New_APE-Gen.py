@@ -226,7 +226,7 @@ def apegen(args):
 	# Get peptide template anchor positions for anchor tolerance filtering
 	if verbose: print("Extract peptide template anchors for anchor tolerance filtering")
 	peptide_template_anchors_xyz, tolerance_anchors = peptide_template.set_anchor_xyz(anchor_selection, peptide)
-
+	print(peptide_template_anchors_xyz)
 
 	if verbose:
 		print("Receptor Successfully Processed")
@@ -274,7 +274,7 @@ def apegen(args):
 		if verbose: print("Aligning peptide anchors to MHC pockets")
 		receptor_template.align(reference=peptide_template, filestore=filestore)
 		if verbose: print("Preparing input to RCD")
-		receptor_template.prepare_for_RCD_v2(reference=peptide_template, peptide=peptide, filestore=filestore)
+		receptor_template.prepare_for_RCD_v3(reference=peptide_template, peptide=peptide, filestore=filestore)
 		add_sidechains(receptor_template.pdb_filename, filestore, addH, keep_IDs=True)
 
 		# Perform RCD on the receptor given peptide:

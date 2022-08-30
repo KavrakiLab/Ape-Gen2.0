@@ -12,13 +12,15 @@ import os
 import re
 import pickle as pkl
 
-from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  \
+from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,                     \
 											rev_anchor_dictionary, all_three_to_one_letter_codes,  \
 											move_file, copy_file, merge_and_tidy_pdb,              \
 											replace_chains, remove_remarks_and_others_from_pdb,    \
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
-											verbose, extract_anchors, count_number_of_atoms, score_sequences
+											verbose, extract_anchors, count_number_of_atoms,       \
+											score_sequences, predict_anchors
+
 from classes.pMHC_class import pMHC
 
 from subprocess import call
@@ -76,29 +78,23 @@ class Peptide(object):
 		sequence_length = len(self.sequence)
 		templates = pd.read_csv("./helper_files/Updated_template_information.csv") # Fetch template info
 
-		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 		# removes pdb code of peptide in order to cross validate (just for testing)
+		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
+		
 
 		# Current policy of selecting/chosing peptide templates is:
-		# 1) Use RF to predict which anchors are to be selected (or given as an input?), and fetch the best matches
-		# Let's assume for now that we have the RF, and we will be fetching templates from the DB
-		# (maybe play with user input for now?)
+		# 1) Feature filtering to predict which are the anchors (when they are not given)
 		if anchors == "":
 			
 			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-			# Load the MHCflurry frequencies
-			frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
 
-			frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
-			frequencies['X'] = np.zeros(frequencies.shape[0])
-			frequencies_alleles = pd.unique(frequencies['allele'])
-
-			if receptor_allotype in frequencies_alleles:
-				if verbose(): print("Receptor allotype has a known MHC binding motif!")
-				anchors = extract_anchors(self.sequence, receptor_allotype, frequencies)
-			else:
-				print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
-				anchors = "2," + str(sequence_length)
+			anchors, anchor_status = predict_anchors(self.sequence, receptor_allotype)
+			
+			if verbose():
+				if anchor_status == "Not Known":
+					print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
+				else:
+					print("Receptor allotype has a known MHC binding motif!")
 
 		if verbose(): print("Predicted anchors for the peptide: ", anchors)
 		anchors_not = process_anchors(anchors, self.sequence)
@@ -161,20 +157,21 @@ class Peptide(object):
 		template_major_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Major_anchor_not'].values[0])])
 		template_secondary_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 		peptide_primary_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchors_not])
-		peptide_second_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 
 		# 6) Secondary anchors adjustment!
-		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
-		peptide_second_anchors = [int(anchor) - Anchor_diff_1 for anchor in peptide_second_anchors]
-
 		# Filtering secondary anchors that won't make sense give the left/right tilt
-		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor < sequence_length]
-
+		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
+		peptide_second_anchors = [int(anchor) - Anchor_diff_1 for anchor in template_secondary_anchors]
+		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
+		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if int(anchor) - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
+		
 		# 6) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
 														  primary_anchors=template_major_anchors,
 														  secondary_anchors=template_secondary_anchors))
+
+		print("Done with peptide template!")
 
 		# 7) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
@@ -250,25 +247,25 @@ class Peptide(object):
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 8 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 8 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 8 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
