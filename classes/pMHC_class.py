@@ -4,7 +4,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, i
 											move_batch_of_files, merge_and_tidy_pdb,			   \
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, select_models, move_file, 	   \
-											remove_file, verbose, add_missing_residues
+											remove_file, verbose, add_missing_residues, apply_mutations
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -55,6 +55,7 @@ class pMHC(object):
 		#pymol.cmd.quit()
 		p1.stop()
 
+	'''
 
 	def prepare_for_RCD(self, reference, peptide, filestore):
 
@@ -179,15 +180,15 @@ class pMHC(object):
 
 		# 2. Here, I am deleting the anchor residues from the peptide template that do not correspond to any aas from the peptide we want to model due to the tilt
 		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
-									    (pdb_df_peptide['residue_number'] < anchor_2_diff + len(peptide.sequence))]
-		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
-
+									    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
+		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff			    
+		
 		# Store the peptide now:
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
 		anchor_pdb = filestore + '/2_input_to_RCD/2_peptide_del.pdb'
 		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
 
-		anchored_MHC_file_name = filestore + '/2_input_to_RCD/2_anchored_pMHC_del.pdb'
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_del.pdb'
 		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
 
 		# 3. Here, I am adding the extra amino acids that were not replaced due to the tilt. 
@@ -214,7 +215,7 @@ class pMHC(object):
 				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
 			seqres.close()
 
-		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/2_anchored_pMHC_del_seqres.pdb'
+		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_del_seqres.pdb'
 		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
 
 		# Now I guess I can try adding the extra amino acids with PDBFixer:
@@ -223,8 +224,194 @@ class pMHC(object):
 		# Now I need to re-filter them, haha, yay
 		# Thoughts: What if I do it with PDBFixer mutations instead? That would save potentially many troubles
 		# If not, maybe I can add the extras before I do anything, and then do the filtering and the replacement.
+		# That could probably be better because I will need to re-index too probably?
+
+		# Filter side-chains from peptide again...
+		ppdb_peptide.read_pdb(anchored_MHC_file_name_seqres)
+		pdb_df_peptide = ppdb_peptide.df['ATOM'].copy()
+		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['chain_id'] == 'A') | \
+										((pdb_df_peptide['chain_id'] == 'C') & \
+										(pdb_df_peptide['atom_name'].isin(['N', 'CA', 'C', 'O', 'CB'])))]
+
+		# Filter out CBs when we have a Glycine (they shouldn't be there):
+		pdb_df_peptide = pdb_df_peptide[~((pdb_df_peptide['residue_name'] == 'GLY') & \
+										 (pdb_df_peptide['atom_name'] == 'CB') & \
+										 ((pdb_df_peptide['chain_id'] == 'C')))]
 		
-		input()
+		min_residue_number = pdb_df_peptide['residue_number'].min()
+		pdb_df_peptide.update(pdb_df_peptide['residue_number'] + 1 - min_residue_number) 
+
+		ppdb_peptide.df['ATOM'] = pdb_df_peptide
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_proper.pdb'								
+		ppdb_peptide.to_pdb(path=anchored_MHC_file_name, records=['ATOM'], gz=False, append_newline=True)
+
+		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
+		anchor_1 = peptide.primary_anchors[0]
+		if anchor_1 == 1: anchor_1 = 2
+		anchor_2 = peptide.primary_anchors[1]
+		if anchor_2 == len(peptide.sequence) - 1: anchor_2 = len(peptide.sequence)
+
+		# Only peptide
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
+
+		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1)))]
+		ppdb_peptide.df['ATOM'] = N_terminus
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
+							records=['ATOM'], gz=False, append_newline=True)
+		
+		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(anchor_2, len(peptide.sequence) + 1)))]
+		ppdb_peptide.df['ATOM'] = C_terminus
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/C_ter.pdb', 
+							records=['ATOM'], gz=False, append_newline=True)
+		# DONE!
+	
+	'''
+	
+	def prepare_for_RCD_v3(self, reference, peptide, filestore):
+
+		# Let's try a different version of this that does:
+		# 1. Deletion
+		# 2. Mutation through PDBFixer
+		# 3. Insertion through PDBFixer again
+
+		initialize_dir(filestore + '/2_input_to_RCD')
+
+		# Delete the peptide from the receptor template:
+		ppdb_receptor = PandasPdb()
+		ppdb_receptor.read_pdb(self.pdb_filename)
+		pdb_df_receptor = ppdb_receptor.df['ATOM']
+		ppdb_receptor.df['ATOM'] = ppdb_receptor.df['ATOM'][ppdb_receptor.df['ATOM']['chain_id'] != 'C']
+		self.pdb_filename = filestore + '/2_input_to_RCD/receptor.pdb'
+		ppdb_receptor.to_pdb(path=self.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
+
+		# Let's delete the peptide remaining residue
+		ppdb_peptide = PandasPdb()
+		ppdb_peptide.read_pdb(reference.pdb_filename)
+		pdb_df_peptide = ppdb_peptide.df['ATOM']
+
+		# Only peptide
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
+
+		# Calculate anchor diff
+		anchor_1_ref = reference.peptide.primary_anchors[0]
+		anchor_2_ref = reference.peptide.primary_anchors[1]
+		anchor_1_pep = peptide.primary_anchors[0]
+		anchor_2_pep = peptide.primary_anchors[1]
+		anchor_1_diff = anchor_1_ref - anchor_1_pep
+		anchor_2_diff = anchor_2_ref - anchor_2_pep
+
+		# Delete
+		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
+									    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
+		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
+
+		# Store
+		ppdb_peptide.df['ATOM'] = pdb_df_peptide
+		anchor_pdb = filestore + '/2_input_to_RCD/2_peptide_del.pdb'
+		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_del.pdb'
+		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
+
+		print('Deletion completed!')
+
+		# Mutate
+		# First align the sequences the way it is done in the peptide template selection code
+		anchor_2_diff = anchor_2_ref - len(reference.peptide.sequence) + anchor_2_pep - len(peptide.sequence)
+		extra_in_beginning = ''.join('-'*abs(anchor_1_diff))
+		extra_in_end = ''.join('-'*abs(anchor_2_diff))
+		if anchor_1_diff > 0:
+			temp_sequence_in_question = extra_in_beginning + peptide.sequence
+			temp_template_sequence = reference.peptide.sequence
+		else:
+			temp_sequence_in_question = peptide.sequence
+			temp_template_sequence = extra_in_beginning + reference.peptide.sequence
+		if anchor_2_diff > 0:
+			temp_sequence_in_question = temp_sequence_in_question + extra_in_end
+		else:
+			temp_template_sequence = temp_template_sequence + extra_in_end
+
+		# Calculate the mutation list
+		aa_list_ref = list(temp_template_sequence)
+		aa_list_in_question = list(temp_sequence_in_question)
+		mutation_list = []
+		for i in range(anchor_1_ref, anchor_2_ref + 1):
+			if aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
+				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
+		print(temp_sequence_in_question)
+		print(temp_template_sequence)
+		print(mutation_list)
+
+		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
+
+		print('Mutations completed!')
+
+		# Insert
+		seqres_pdb = filestore + '/2_input_to_RCD/seqres.pdb'
+		three_letter_list = [all_one_to_three_letter_codes[aa] for aa in list(peptide.sequence)]
+		if len(three_letter_list) <= 9:
+			three_letter_string = ' '.join(three_letter_list)
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C    " + str(len(three_letter_list)) + "  " + three_letter_string)
+			seqres.close()
+		elif len(three_letter_list) <= 13:
+			three_letter_string = ' '.join(three_letter_list)
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string)
+			seqres.close()
+		else:
+			three_letter_string_1 = ' '.join(three_letter_list[:13])
+			three_letter_string_2 = ' '.join(three_letter_list[13:])
+			with open(seqres_pdb, 'w') as seqres:
+				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string_1)
+				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
+			seqres.close()
+
+		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_del_seqres.pdb'
+		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
+
+		# Now I guess I can try adding the extra amino acids with PDBFixer:
+		add_missing_residues(anchored_MHC_file_name_seqres, filestore)
+
+		print('Insertions completed!')
+
+		# Keep only the backbone in the end:
+		ppdb_peptide.read_pdb(anchored_MHC_file_name_seqres)
+		pdb_df_peptide = ppdb_peptide.df['ATOM'].copy()
+		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['chain_id'] == 'A') | \
+										((pdb_df_peptide['chain_id'] == 'C') & \
+										(pdb_df_peptide['atom_name'].isin(['N', 'CA', 'C', 'O', 'CB'])))]
+
+		# Filter out CBs when we have a Glycine (they shouldn't be there):
+		pdb_df_peptide = pdb_df_peptide[~((pdb_df_peptide['residue_name'] == 'GLY') & \
+										 (pdb_df_peptide['atom_name'] == 'CB') & \
+										 ((pdb_df_peptide['chain_id'] == 'C')))]
+		
+		min_residue_number = pdb_df_peptide['residue_number'].min()
+		pdb_df_peptide.update(pdb_df_peptide['residue_number'] + 1 - min_residue_number) 
+
+		ppdb_peptide.df['ATOM'] = pdb_df_peptide
+		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_proper.pdb'								
+		ppdb_peptide.to_pdb(path=anchored_MHC_file_name, records=['ATOM'], gz=False, append_newline=True)
+
+		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
+		anchor_1 = peptide.primary_anchors[0]
+		if anchor_1 == 1: anchor_1 = 2
+		anchor_2 = peptide.primary_anchors[1]
+		if anchor_2 == len(peptide.sequence) - 1: anchor_2 = len(peptide.sequence)
+
+		# Only peptide
+		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
+
+		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1)))]
+		ppdb_peptide.df['ATOM'] = N_terminus
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
+							records=['ATOM'], gz=False, append_newline=True)
+		
+		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(anchor_2, len(peptide.sequence) + 1)))]
+		ppdb_peptide.df['ATOM'] = C_terminus
+		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/C_ter.pdb', 
+							records=['ATOM'], gz=False, append_newline=True)
+		# DONE!
 
 	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore):
 		
@@ -233,35 +420,42 @@ class pMHC(object):
 
 		# Create loops.txt file
 		os.chdir(filestore + "/2_input_to_RCD/")
+		# The canonical case is the N-termini anchor being in pos 2, however, if it is in pos 1, just because we need
+		# to have a Start-2 Start-1 config, the N-termini endpoint must be in pos 3
 		one_end = peptide.primary_anchors[0] + 1
 		if one_end == 2: one_end = 3
-		other_end = peptide.primary_anchors[1] - 2
-		if other_end == len(peptide.sequence) - 3: other_end = other_end + 1
+
+		# Similarly, the canonical case in C-termini is P-Omega. However, in that case, we need an extra AA because the
+		# Configuration is End-2 End-1. So in the canonical case, P-Omega -2 is the endpoint. 
+		other_end = peptide.primary_anchors[1] - 1
+		if peptide.primary_anchors[1] == len(peptide.sequence): other_end = other_end - 1
 		with open("./loops.txt", 'w') as loops:
-			loops.write("anchored_pMHC.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
+			loops.write("anchored_pMHC_proper.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
 		loops.close()
 
+		print("RCD preparation Done!")
+
 		# Call RCD
-		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_rmsd.txt"], shell=True)
+		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " --bench loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_proper_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_proper_rmsd.txt"], shell=True)
 
 		# Move files to back to destination folder
-		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_")
+		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_proper_")
 		move_batch_of_files('./', '../3_RCD_data/', query="results")
 		os.chdir("../3_RCD_data/")
-		input()
 
-		korp_res = pd.read_csv("anchored_pMHC_rmsd.txt", sep = " ")
+		korp_res = pd.read_csv("anchored_pMHC_proper_rmsd.txt", sep = " ",  comment='#', header=None)
+		korp_res.columns = ['Loop', 'RMSD', 'Bump', 'BumpEx', 'BumpIn', 'Energy']
 		if loop_score in ['KORP', 'ICOSA']:
-			best_indexes = korp_res.sort_values(by=['Energy'])['#loop'].head(num_loops).tolist()
+			best_indexes = korp_res.sort_values(by=['Energy'])['Loop'].head(num_loops).tolist()
 		elif loop_score == 'RMSD':
-			best_indexes = korp_res.sort_values(by=['RMSD'])['#loop'].head(num_loops).tolist()
+			best_indexes = korp_res.sort_values(by=['RMSD'])['Loop'].head(num_loops).tolist()
 		else:
 			best_indexes = random.sample(range(rcd_num_loops), num_loops)
 		# Score loops if the user wants it to
 		if verbose(): print("RCD done!")
 
 		# Split the output into files, as the output .pdb has many models			   
-		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_closed.pdb"]), outname="model")
+		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_proper_closed.pdb"]), outname="model")
 		initialize_dir('./splits')
 		move_batch_of_files('./', './splits', query="model")
 		os.chdir(pwd)

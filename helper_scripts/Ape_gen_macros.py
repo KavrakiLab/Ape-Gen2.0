@@ -146,6 +146,17 @@ def add_missing_residues(pdb_filename, filestore):
 	fp.close()
 	return pdb_filename
 
+def apply_mutations(pdb_filename, filestore, mutation_list):
+	fixer = PDBFixer(filename=pdb_filename)
+	fixer.applyMutations(mutation_list, "C")
+	fixer.findMissingResidues()
+	fixer.findMissingAtoms()
+	fixer.addMissingAtoms()
+	fp = open(pdb_filename, 'w')
+	PDBFile.writeFile(fixer.topology, fixer.positions, fp, keepIds=True)
+	fp.close()
+	return pdb_filename
+
 def merge_and_tidy_pdb(list_of_pdbs, dst):
 	merged = pdb_merge.run(pdb_merge.check_input(list_of_pdbs))
 	sorteded = pdb_sort.run(merged, sorting_keys='-RC')
@@ -480,3 +491,18 @@ def extract_anchors(peptide, MHC, frequencies):
 		anchor_2 = str(len(peptide) - 2) 
 
 	return ",".join([anchor_1, anchor_2])
+
+def predict_anchors(peptide, MHC):
+
+	frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
+	frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
+	frequencies['X'] = np.zeros(frequencies.shape[0])
+	frequencies_alleles = pd.unique(frequencies['allele'])
+
+	if MHC in frequencies_alleles:
+		anchors = extract_anchors(peptide, MHC, frequencies)
+		anchor_status = "Known"
+	else:
+		anchors = "2," + str(sequence_length)
+		anchor_status = "Not Known"
+	return anchors, anchor_status
