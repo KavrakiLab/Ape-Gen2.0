@@ -4,7 +4,8 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, i
 											move_batch_of_files, merge_and_tidy_pdb,			   \
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, select_models, move_file, 	   \
-											remove_file, verbose, add_missing_residues, apply_mutations
+											remove_file, verbose, add_missing_residues,            \
+											apply_mutations, filter_chains
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -266,7 +267,7 @@ class pMHC(object):
 		# DONE!
 	
 	'''
-	
+
 	def prepare_for_RCD_v3(self, reference, peptide, filestore):
 
 		# Let's try a different version of this that does:
@@ -334,11 +335,12 @@ class pMHC(object):
 		aa_list_ref = list(temp_template_sequence)
 		aa_list_in_question = list(temp_sequence_in_question)
 		mutation_list = []
-		for i in range(anchor_1_ref, anchor_2_ref + 1):
-			if aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
-				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
 		print(temp_sequence_in_question)
 		print(temp_template_sequence)
+		for i in range(0, len(temp_sequence_in_question)):
+			if aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
+				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i + 1) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
+		
 		print(mutation_list)
 
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
@@ -366,11 +368,14 @@ class pMHC(object):
 				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
 			seqres.close()
 
-		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_del_seqres.pdb'
+		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_native.pdb'
 		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
 
 		# Now I guess I can try adding the extra amino acids with PDBFixer:
 		add_missing_residues(anchored_MHC_file_name_seqres, filestore)
+
+		# Keep the peptide file separately, as it will be used for refinement downstream:
+		filter_chains(anchored_MHC_file_name_seqres, ("C",), filestore + "/2_input_to_RCD/model_0.pdb")
 
 		print('Insertions completed!')
 
@@ -413,7 +418,7 @@ class pMHC(object):
 							records=['ATOM'], gz=False, append_newline=True)
 		# DONE!
 
-	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, filestore):
+	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, include_template_in_scoring, filestore):
 		
 		initialize_dir(filestore + '/3_RCD_data')
 		pwd = os.getcwd()
@@ -446,9 +451,9 @@ class pMHC(object):
 		korp_res = pd.read_csv("anchored_pMHC_proper_rmsd.txt", sep = " ",  comment='#', header=None)
 		korp_res.columns = ['Loop', 'RMSD', 'Bump', 'BumpEx', 'BumpIn', 'Energy']
 		if loop_score in ['KORP', 'ICOSA']:
-			best_indexes = korp_res.sort_values(by=['Energy'])['Loop'].head(num_loops).tolist()
+			best_indexes = korp_res.sort_values(by=['Energy'])['Loop'].head(num_loops).astype(int).tolist()
 		elif loop_score == 'RMSD':
-			best_indexes = korp_res.sort_values(by=['RMSD'])['Loop'].head(num_loops).tolist()
+			best_indexes = korp_res.sort_values(by=['RMSD'])['Loop'].head(num_loops).astype(int).tolist()
 		else:
 			best_indexes = random.sample(range(rcd_num_loops), num_loops)
 		# Score loops if the user wants it to
@@ -460,6 +465,9 @@ class pMHC(object):
 		move_batch_of_files('./', './splits', query="model")
 		os.chdir(pwd)
 		
+		# Finally, if you want the native conf to be considered, add 0 as index
+		if include_template_in_scoring: best_indexes.append(0)
+
 		return best_indexes
 
 	def set_anchor_xyz(self, anchor_selection, peptide):

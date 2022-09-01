@@ -122,8 +122,8 @@ def add_sidechains(pdb_filename, filestore, add_hydrogens, peptide_idx=-1, remov
 	if remove_heterogens: fixer.removeHeterogens(True) #  True keeps water molecules while removing all other heterogens, REVISIT!
 	fixer.findMissingAtoms()
 	fixer.addMissingAtoms()
-	if add_hydrogens != "none": fixer.addMissingHydrogens(7.0) # Ask Mauricio about those
-	if add_solvent: fixer.addSolvent(fixer.topology.getUnitCellDimensions()) # Ask Mauricio about those
+	if add_hydrogens != "none": fixer.addMissingHydrogens(7.0)
+	if add_solvent: fixer.addSolvent(fixer.topology.getUnitCellDimensions())
 	if peptide_idx != -1:
 			pdb_filename = filestore + '/02_add_sidechains/PTMed_' + str(peptide_idx) + '.pdb'
 	
@@ -205,6 +205,12 @@ def split_receptor_and_peptide(pdb_file):
 	file.close()
 
 	return (receptor_filename, peptide_filename)
+
+def filter_chains(pdb_file, chains, dst):
+	filtered = pdb_selchain.run(open(pdb_file, 'r'), chains)
+	with open(dst, 'w') as file:
+		file.write(''.join(filtered))
+	file.close()
 
 def remove_remarks_and_others_from_pdb(pdb_file, records=('ATOM', 'TER', 'END ')): 
 	fhandle = open(pdb_file, 'r')
