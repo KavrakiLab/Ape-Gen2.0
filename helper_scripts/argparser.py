@@ -26,4 +26,5 @@ def APE_Gen_parser():
 	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
 	parser.add_argument("--addH", type=str, default='all', choices=['all', 'polar', 'none'], help='Adding hydrogens (all/polar only/no hydrogens)')
 	parser.add_argument("--loop_score", type=str, default='ICOSA', choices=['RMSD', 'KORP', 'ICOSA', 'none'], help='Choose scoring function for RCD loop scoring (none will avoid scoring altogether)')
+	parser.add_argument("--include_template_in_scoring", action="store_true", help='In addition to RCD loops being refined and scored, the structural conformation of the peptide template is also included, untouched.')
 	return parser

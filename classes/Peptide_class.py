@@ -144,6 +144,9 @@ class Peptide(object):
 				temp_template_sequence = temp_template_sequence + extra_in_end
 			score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
 											  matrix=blosum_62, gap_penalty=0))
+		self_score = score_sequences(temp_sequence_in_question, temp_sequence_in_question, 
+									 matrix=blosum_62, gap_penalty=0)
+		score_list_norm = score_list/self_score
 		templates['similarity_score'] = score_list
 		templates = templates[templates['similarity_score'] == templates['similarity_score'].max()].dropna()
 
@@ -158,6 +161,10 @@ class Peptide(object):
 		template_secondary_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
 		peptide_primary_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchors_not])
 
+		print(template_major_anchors)
+		print(template_secondary_anchors)
+		print(peptide_primary_anchors)
+
 		# 6) Secondary anchors adjustment!
 		# Filtering secondary anchors that won't make sense give the left/right tilt
 		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
@@ -165,6 +172,9 @@ class Peptide(object):
 		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
 		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if int(anchor) - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
 		
+		print(template_secondary_anchors)
+		print(peptide_primary_anchors)
+
 		# 6) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
@@ -290,9 +300,9 @@ class Peptide(object):
 		# Only positions
 		pdb_peptide_anchors_xyz = pdb_df_peptide[['x_coord', 'y_coord', 'z_coord']].to_numpy()
 
-		# If difference is smaller than the tolerance, keep the file, else don't
+		# If difference is smaller than the tolerance, keep the file, else don't (exception for the native one, but it'll probably pass anyway)
 		anchor_difference = np.linalg.norm(pdb_peptide_anchors_xyz - peptide_template_anchors_xyz, axis=1)
-		if np.all(anchor_difference < anchor_tol):
+		if (np.all(anchor_difference < anchor_tol)) or (self.index == 0):
 			
 			# Keep the scores of the remaining survivors
 			with open(self.pdb_filename, 'r') as peptide_handler:

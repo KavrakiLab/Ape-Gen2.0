@@ -62,6 +62,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Index Variable is still not fixed properly, check `compute_anchor_tolerance` to see how it is. 
+- Taxonomy on what is a macro and what is a class method must be done at some point
 - Send an e-mail to Chacon lab for the RCD file that does not want to work
 - Wrap the anchor extraction/other things that can be wrapped in the Peptide/pMHC class from the initial part up to the RCD (but also in general) and put them in the macro file, they looks ugly.
 - Put a check so that if a peptide template with an MHC that is the same as the input allotype is found, don't bother fetching smth different, and just assign the same template as the receptor (that would require flipping the template selection order though). 
@@ -84,7 +86,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Include the native backbone in the post-processing (at least when using the RMSD as a loop scoring mechanism)
+- The template fetching needs probably a consensus score that fetches both by taking into account peptide similarity, but also MHC similarity...
 - Testing/Testing/Testing...
 
 ### PTMs:
