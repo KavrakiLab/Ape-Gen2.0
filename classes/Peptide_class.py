@@ -80,16 +80,12 @@ class Peptide(object):
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
-		
 
 		# Current policy of selecting/chosing peptide templates is:
 		# 1) Feature filtering to predict which are the anchors (when they are not given)
-		if anchors == "":
-			
+		if anchors == "":	
 			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-
 			anchors, anchor_status = predict_anchors(self.sequence, receptor_allotype)
-			
 			if verbose():
 				if anchor_status == "Not Known":
 					print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
@@ -97,9 +93,6 @@ class Peptide(object):
 					print("Receptor allotype has a known MHC binding motif!")
 
 		if verbose(): print("Predicted anchors for the peptide: ", anchors)
-		anchors_not = process_anchors(anchors, self.sequence)
-		templates['Major_anchor_not'] = templates['Major_anchor_not'].apply(lambda x: x.split(","))
-		templates['Secondary_anchor_not'] = templates['Secondary_anchor_not'].apply(lambda x: x.split(","))
 
 		# Bring the templates having same anchor distance as the give peptide-MHC (NOTE: Calculate this offline as an improvement?)
 		int_anchors = [int(pos) for pos in anchors.split(",")]
@@ -108,22 +101,23 @@ class Peptide(object):
 		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
 		templates = templates[templates['anchor_diff'] == diff]
 
-		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs
-		# But what if the motifs are not known?
+		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs + peptide similarity
+		# This helps mitigating the effect of overfitting to a peptide sequence or an allele
+
+		# 2a. Allele similarity:
 		sub_alleles = pd.unique(templates['MHC']).tolist()
 		sub_alleles.append("Allele")
 		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
-		allele_of_interest = similarity_matrix[similarity_matrix["Allele"] == receptor_allotype].drop("Allele", axis=1).T
-		similar_alleles = allele_of_interest[allele_of_interest == allele_of_interest.min().values[0]].dropna().index.values[0]
-
-		templates = templates[templates['MHC'] == similar_alleles]
+		similarity_matrix = similarity_matrix[similarity_matrix["Allele"] == receptor_allotype].drop("Allele", axis=1).T.reset_index(drop=False)
+		similarity_matrix.columns = ['MHC', 'MHC_similarity']
+		templates = templates.merge(similarity_matrix, how='inner', on='MHC')
 
 		templates['Major_anchor_1'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[0].astype(int)
 		templates['Major_anchor_2'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[1].astype(int)
 		templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
 		templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
 
-		# 3) Select the template that is the closest in terms of sequence:
+		# 2b. Peptide similarity:
 		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
@@ -147,46 +141,45 @@ class Peptide(object):
 		self_score = score_sequences(temp_sequence_in_question, temp_sequence_in_question, 
 									 matrix=blosum_62, gap_penalty=0)
 		score_list_norm = score_list/self_score
-		templates['similarity_score'] = score_list
-		templates = templates[templates['similarity_score'] == templates['similarity_score'].max()].dropna()
+		templates['Peptide_similarity'] = score_list_norm
 
-		# 4) If there are duplicate results, select at one at random!
+		# 2c. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
+		# If there are duplicate results, select at one at random!
+		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
+		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
 		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
-		# 5) Extract the anchor position numbers for the anchor tolerance step!
+		if verbose(): 
+			print("Got " + final_selection['pdb_code'].values[0] + "! This template has " + final_selection['MHC'].values[0] + " as the allele...")
+
+		# 3) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
-		template_major_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Major_anchor_not'].values[0])])
-		template_secondary_anchors = sorted([rev_anchor_dictionary[anchor][str(template_peptide_length)] for anchor in list(final_selection['Secondary_anchor_not'].values[0])])
-		peptide_primary_anchors = sorted([rev_anchor_dictionary[anchor][str(sequence_length)] for anchor in anchors_not])
+		template_major_anchors = [int(anchor) for anchor in final_selection['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
+		template_secondary_anchors = [int(anchor) for anchor in final_selection['Secondary_anchors'].apply(lambda x: x.split(",")).values[0]]
+		peptide_primary_anchors = int_anchors
 
-		print(template_major_anchors)
-		print(template_secondary_anchors)
-		print(peptide_primary_anchors)
-
-		# 6) Secondary anchors adjustment!
+		# 4) Secondary anchors adjustment!
 		# Filtering secondary anchors that won't make sense give the left/right tilt
 		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
-		peptide_second_anchors = [int(anchor) - Anchor_diff_1 for anchor in template_secondary_anchors]
+		peptide_second_anchors = [anchor - Anchor_diff_1 for anchor in template_secondary_anchors]
 		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
-		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if int(anchor) - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
-		
-		print(template_secondary_anchors)
-		print(peptide_primary_anchors)
+		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if anchor - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
 
-		# 6) Define the peptide template object
+		# 5) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
 														  primary_anchors=template_major_anchors,
 														  secondary_anchors=template_secondary_anchors))
 
-		print("Done with peptide template!")
+		if verbose(): print("Done with choosing a peptide template!")
 
-		# 7) Return both the peptide object, as well as the peptide template that was chosen
+		# 6) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
 		self.primary_anchors = peptide_primary_anchors 
 		self.secondary_anchors = peptide_second_anchors
+
 		return peptide_template
 
 	def perform_PTM(self, filestore, current_round):
@@ -528,7 +521,7 @@ def PTM_error_checking(amino_acid):
 				if verbose(): print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
 				sys.exit(0)
 		else:
-			if verbose(): print("PTM chosen is methylation. You can only mono-methylate (mm), di-methylate (md) or tri-methylate (mt).")
+			if verbose(): print("PTM chosen is cysteine oxidation. You can only cysteine-hydroxidate (xh), cysteine-oxidate (xo) or cysteine-dioxidate (xd).")
 			sys.exit(0)
 	elif prefix == 'o':
 		if amino_acid in m_oxidation_list:
