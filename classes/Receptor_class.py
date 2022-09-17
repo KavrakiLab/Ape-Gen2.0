@@ -180,7 +180,7 @@ class Receptor(object):
 		self.useSMINA = True
 
 	def init_receptor(receptor_class, file_storage, peptide_input, cv=''):
-		if verbose(): print("Processing Receptor Input")
+		if verbose(): print("\nProcessing Receptor Input: " + receptor_class)
 
 		if receptor_class.endswith(".pdb"):
 			# If the file is .pdb, this will be your template! ##MUST CHECK VALIDITY IN THE FUNCTION
@@ -201,8 +201,6 @@ class Receptor(object):
 			receptor = Receptor.fromallotype(receptor_class, peptide_input, file_storage, cv)
 			receptor_template_file = receptor.pdb_filename
 		return receptor, receptor_template_file
-
-
 
 	@classmethod
 	def frompdb(cls, pdb_filename): # Checking if .pdb file is ok maybe?
@@ -237,8 +235,12 @@ class Receptor(object):
 				score_list.append(aligner.score(peptide_sequence, template_sequence))
 			templates['peptide_score'] = score_list
 			templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
-			pdb_filename = templates['pdb_code'].sample(n=1).values[0]
-			if verbose(): print("Got " + pdb_filename + "!")
+			templates = templates.sample(n=1)
+			pdb_filename = templates['pdb_code'].values[0]
+			if verbose(): 
+				print("\tGot " + pdb_filename + "!")
+				print("\tPeptide is " + templates['peptide'].values[0])
+				print("\tMHC is " + templates['MHC'].values[0])
 			return(cls(allotype=allotype, pdb_filename='./new_templates/' + pdb_filename))
 		
 		# Check #2: Existing sequence

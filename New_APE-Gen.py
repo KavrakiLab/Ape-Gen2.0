@@ -231,15 +231,14 @@ def apegen(args):
 	receptor_template = pMHC(pdb_filename=receptor_template_file, peptide=peptide, receptor=receptor)
 
 	# Get peptide template anchor positions for anchor tolerance filtering
-	if verbose: print("Extract peptide template anchors for anchor tolerance filtering")
 	peptide_template_anchors_xyz, tolerance_anchors = peptide_template.set_anchor_xyz(anchor_selection, peptide)
 
 	if verbose:
-		print("Receptor Successfully Processed")
+		print("\nReceptor Successfully Processed")
 		print("    Receptor Allotype: " + receptor.allotype)
 		print("    Receptor Template: " + receptor_template.pdb_filename)
 
-		print("Peptide Successfully Processed")
+		print("\nPeptide Successfully Processed")
 		print("    Peptide Sequence: " + peptide.sequence)
 		print("    Peptide Template: " + peptide_template.pdb_filename)
 		print("    Peptide Primary Anchors:")
