@@ -285,6 +285,20 @@ def score_sequences(seq1, seq2, matrix, gap_penalty):
 		score += gap_penalty if diag else matrix[A,B]
 	return score
 
+def anchor_alignment(seq1, seq2, anchor_diff1, anchor_diff2):
+	extra_in_beginning = ''.join('-'*abs(anchor_diff1))
+	extra_in_end = ''.join('-'*abs(anchor_diff2))
+	if anchor_diff1 > 0:
+		temp_seq1 = extra_in_beginning + seq1
+		temp_seq2 = seq2
+	else:
+		temp_seq1 = seq1
+		temp_seq2 = extra_in_beginning + seq2
+	if anchor_diff2 > 0:
+		temp_seq1 = temp_seq1 + extra_in_end
+	else:
+		temp_seq2 = temp_seq2 + extra_in_end
+	return temp_seq1, temp_seq2
 
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
 

@@ -5,7 +5,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, i
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, select_models, move_file, 	   \
 											remove_file, verbose, add_missing_residues,            \
-											apply_mutations, filter_chains
+											apply_mutations, filter_chains, anchor_alignment
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -63,25 +63,22 @@ class pMHC(object):
 		# 2. Mutation through PDBFixer
 		# 3. Insertion through PDBFixer again
 
+		# Extra steps:
+	    # 1. Keep copies of the reference file before feeding it to RCD. The purpose of this is to be close to the template and optimize on it, like PANDORA.
+
 		initialize_dir(filestore + '/2_input_to_RCD')
 
-		# Delete the peptide from the receptor template:
-		ppdb_receptor = PandasPdb()
-		ppdb_receptor.read_pdb(self.pdb_filename)
-		pdb_df_receptor = ppdb_receptor.df['ATOM']
-		ppdb_receptor.df['ATOM'] = ppdb_receptor.df['ATOM'][ppdb_receptor.df['ATOM']['chain_id'] != 'C']
-		self.pdb_filename = filestore + '/2_input_to_RCD/receptor.pdb'
-		ppdb_receptor.to_pdb(path=self.pdb_filename, records=['ATOM'], gz=False, append_newline=True)
+		# 1. Deletion routine:
 
-		# Let's delete the peptide remaining residue
+		# 1a. Load the peptide template file
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(reference.pdb_filename)
 		pdb_df_peptide = ppdb_peptide.df['ATOM']
 
-		# Only peptide
+		# 1b. Filter for only peptide to be there
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
 
-		# Calculate anchor diff
+		# 1c. Calculate anchor differences between reference and peptide in question
 		anchor_1_ref = reference.peptide.primary_anchors[0]
 		anchor_2_ref = reference.peptide.primary_anchors[1]
 		anchor_1_pep = peptide.primary_anchors[0]
@@ -89,49 +86,45 @@ class pMHC(object):
 		anchor_1_diff = anchor_1_ref - anchor_1_pep
 		anchor_2_diff = anchor_2_ref - anchor_2_pep
 
-		# Delete
+		# 1d. Delete if there is a tilt
 		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
 									    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
 		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
 
-		# Store
+		# 1e. Store
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
 		anchor_pdb = filestore + '/2_input_to_RCD/2_peptide_del.pdb'
 		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
 		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_del.pdb'
-		merge_and_tidy_pdb([self.pdb_filename, anchor_pdb], anchored_MHC_file_name)
+		merge_and_tidy_pdb([self.receptor.pdb_filename, anchor_pdb], anchored_MHC_file_name)
 
 		print('\tNecessary residue Deletions completed!')
 
-		# Mutate
-		# First align the sequences the way it is done in the peptide template selection code
+		# 2. Mutate
+
+		# 2a. First align the sequences in terms of anchors
 		anchor_2_diff = anchor_2_ref - len(reference.peptide.sequence) + anchor_2_pep - len(peptide.sequence)
-		extra_in_beginning = ''.join('-'*abs(anchor_1_diff))
-		extra_in_end = ''.join('-'*abs(anchor_2_diff))
-		if anchor_1_diff > 0:
-			temp_sequence_in_question = extra_in_beginning + peptide.sequence
-			temp_template_sequence = reference.peptide.sequence
-		else:
-			temp_sequence_in_question = peptide.sequence
-			temp_template_sequence = extra_in_beginning + reference.peptide.sequence
-		if anchor_2_diff > 0:
-			temp_sequence_in_question = temp_sequence_in_question + extra_in_end
-		else:
-			temp_template_sequence = temp_template_sequence + extra_in_end
+		sequence_in_question, template_sequence = anchor_alignment(peptide.sequence, reference.peptide.sequence, 
+															       anchor_1_diff, anchor_2_diff)
 
-		# Calculate the mutation list
-		aa_list_ref = list(temp_template_sequence)
-		aa_list_in_question = list(temp_sequence_in_question)
+		# 2b. Calculate the mutation list
+		aa_list_ref = list(template_sequence)
+		aa_list_in_question = list(sequence_in_question)
 		mutation_list = []
-		for i in range(0, len(temp_sequence_in_question)):
+		for i in range(1 - anchor_1_diff, len(sequence_in_question) - anchor_2_ref + anchor_2_pep):
 			if aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
-				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i + 1) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
+				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
 
+		# 2c. Apply mutations using the mutation list
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
 
 		print('\tNecessary residue Mutations completed!')
 
-		# Insert
+		# 3. Insert
+
+		# 3a. To make the insert, the SEQRES field needs to be added on top of the file
+		# See documentation: https://pdb101.rcsb.org/learn/guide-to-understanding-pdb-data/primary-sequences-and-the-pdb-format
+		# Obviously, this is a pain, because depending on the size of the peptide, there are different conventions:
 		seqres_pdb = filestore + '/2_input_to_RCD/seqres.pdb'
 		three_letter_list = [all_one_to_three_letter_codes[aa] for aa in list(peptide.sequence)]
 		if len(three_letter_list) <= 9:
@@ -151,17 +144,17 @@ class pMHC(object):
 				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string_1)
 				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
 			seqres.close()
-
 		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_native.pdb'
 		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
 
-		# Now I guess I can try adding the extra amino acids with PDBFixer:
+		# 3b. Inserting the extra amino acids with PDBFixer:
 		add_missing_residues(anchored_MHC_file_name_seqres, filestore)
 
-		# Keep the peptide file separately, as it will be used for refinement downstream:
-		filter_chains(anchored_MHC_file_name_seqres, ("C",), filestore + "/2_input_to_RCD/model_0.pdb")
-
 		print('\tNecessary residue Insertions completed!')
+
+		# Keep copies of the peptide file separately, as it will be used for refinement downstream:
+		# Tomorrow: Make this parameter and attend to the rest...
+		filter_chains(anchored_MHC_file_name_seqres, ("C",), filestore + "/2_input_to_RCD/model_0.pdb")
 
 		# Keep only the backbone in the end:
 		ppdb_peptide.read_pdb(anchored_MHC_file_name_seqres)
