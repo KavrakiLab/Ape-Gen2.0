@@ -19,7 +19,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
 											verbose, extract_anchors, count_number_of_atoms,       \
-											score_sequences, predict_anchors
+											score_sequences, predict_anchors, anchor_alignment
 
 from classes.pMHC_class import pMHC
 
@@ -118,28 +118,18 @@ class Peptide(object):
 		templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
 		templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
 
-		# 2b. Peptide similarity:
+		# 2b. Peptide similarity between anchors:
 		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
 		Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
 		Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
 		for i, template_sequence in enumerate(template_sequences):
-			extra_in_beginning = ''.join('-'*abs(Anchor_diff_1[i]))
-			extra_in_end = ''.join('-'*abs(Anchor_diff_2[i]))
-			if Anchor_diff_1[i] > 0:
-				temp_sequence_in_question = extra_in_beginning + self.sequence
-				temp_template_sequence = template_sequence
-			else:
-				temp_sequence_in_question = self.sequence
-				temp_template_sequence = extra_in_beginning + template_sequence
-			if Anchor_diff_2[i] > 0:
-				temp_sequence_in_question = temp_sequence_in_question + extra_in_end
-			else:
-				temp_template_sequence = temp_template_sequence + extra_in_end
+			temp_sequence_in_question, temp_template_sequence = anchor_alignment(self.sequence, template_sequence, 
+																				 Anchor_diff_1[i], Anchor_diff_2[i])
 			score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
 											  matrix=blosum_62, gap_penalty=0))
-		self_score = score_sequences(temp_sequence_in_question, temp_sequence_in_question, 
+		self_score = score_sequences(self.sequence, self.sequence, 
 									 matrix=blosum_62, gap_penalty=0)
 		score_list_norm = score_list/self_score
 		templates['Peptide_similarity'] = score_list_norm
