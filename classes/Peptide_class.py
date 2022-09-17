@@ -42,7 +42,6 @@ class Peptide(object):
 
 	@classmethod
 	def init_peptide(cls, peptide_input):
-		if verbose(): print("Processing Peptide Input")
 		if peptide_input.endswith(".pdb"):
 			# Fetch peptide sequence from .pdb and use that .pdb as a template --> Only when REDOCKING!
 			# Maybe here have a routine that calculates the RSA? Using Naccess (Is that legal even?)
@@ -74,6 +73,8 @@ class Peptide(object):
 		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
 
 	def get_peptide_template(self, receptor_allotype, anchors, anchor_selection, cv=''):
+
+		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
 		templates = pd.read_csv("./helper_files/Updated_template_information.csv") # Fetch template info
@@ -151,9 +152,6 @@ class Peptide(object):
 		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
-		if verbose(): 
-			print("Got " + final_selection['pdb_code'].values[0] + "! This template has " + final_selection['MHC'].values[0] + " as the allele...")
-
 		# 3) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
 		template_major_anchors = [int(anchor) for anchor in final_selection['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
@@ -173,7 +171,11 @@ class Peptide(object):
 														  primary_anchors=template_major_anchors,
 														  secondary_anchors=template_secondary_anchors))
 
-		if verbose(): print("Done with choosing a peptide template!")
+		if verbose(): 
+			print("Done with choosing a peptide template!")
+			print("\tGot " + final_selection['pdb_code'].values[0] + "!")
+			print("\tPeptide is " + final_selection['peptide'].values[0])
+			print("\tMHC is " + final_selection['MHC'].values[0])
 
 		# 6) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
