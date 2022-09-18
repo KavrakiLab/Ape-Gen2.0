@@ -111,9 +111,24 @@ class pMHC(object):
 		aa_list_ref = list(template_sequence)
 		aa_list_in_question = list(sequence_in_question)
 		mutation_list = []
-		for i in range(1 - anchor_1_diff, len(sequence_in_question) - anchor_2_ref + anchor_2_pep):
-			if aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
-				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(i) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
+
+		print(aa_list_ref)
+		print(aa_list_in_question)
+
+		i = 0
+		j = i + 1
+		while(i < len(sequence_in_question)):
+			if aa_list_in_question[i] == '-':
+				j -= 1
+			elif aa_list_ref[i] != '-' and aa_list_in_question[i] != '-' and aa_list_ref[i] != aa_list_in_question[i]:
+				mutation_list.append(all_one_to_three_letter_codes[aa_list_ref[i]] + "-" + str(j) + "-" + all_one_to_three_letter_codes[aa_list_in_question[i]])
+			else:
+				pass
+			i += 1
+			j += 1
+
+		print(mutation_list)
+		input()
 
 		# 2c. Apply mutations using the mutation list
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
@@ -153,7 +168,6 @@ class pMHC(object):
 		print('\tNecessary residue Insertions completed!')
 
 		# Keep copies of the peptide file separately, as it will be used for refinement downstream:
-		# Tomorrow: Make this parameter and attend to the rest...
 		filter_chains(anchored_MHC_file_name_seqres, ("C",), filestore + "/2_input_to_RCD/model_0.pdb")
 
 		# Keep only the backbone in the end:
@@ -195,7 +209,7 @@ class pMHC(object):
 							records=['ATOM'], gz=False, append_newline=True)
 		# DONE!
 
-	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, include_template_in_scoring, filestore):
+	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, non_sampled_confs, filestore):
 		
 		initialize_dir(filestore + '/3_RCD_data')
 		pwd = os.getcwd()
@@ -240,8 +254,8 @@ class pMHC(object):
 		move_batch_of_files('./', './splits', query="model")
 		os.chdir(pwd)
 		
-		# Finally, if you want the native conf to be considered, add 0 as index
-		if include_template_in_scoring: best_indexes.append(0)
+		# Add the rest of the non_sampled conformations, same way as PANDORA does. 
+		best_indexes.extend(list(range(rcd_num_loops + 1, rcd_num_loops + non_sampled_confs + 1)))
 
 		return best_indexes
 
