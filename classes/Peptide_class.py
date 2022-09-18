@@ -137,6 +137,9 @@ class Peptide(object):
 		# 2c. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
 		# If there are duplicate results, select at one at random!
 		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
+
+		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score']].sort_values(by=['Similarity_score'], ascending=False).head(20))
+
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
 		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]

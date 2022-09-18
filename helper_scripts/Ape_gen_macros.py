@@ -523,6 +523,6 @@ def predict_anchors(peptide, MHC):
 		anchors = extract_anchors(peptide, MHC, frequencies)
 		anchor_status = "Known"
 	else:
-		anchors = "2," + str(sequence_length)
+		anchors = "2," + str(len(peptide))
 		anchor_status = "Not Known"
 	return anchors, anchor_status

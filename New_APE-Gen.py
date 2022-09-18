@@ -5,7 +5,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains
 											copy_file, pretty_print_analytics, move_batch_of_files,\
 											copy_batch_of_files, split_receptor_and_peptide,	   \
 											remove_remarks_and_others_from_pdb, replace_HETATM,    \
-											delete_elements, verbose, set_verbose, move_file
+											delete_elements, verbose, set_verbose
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -88,20 +88,20 @@ def prepare_for_openmm(conf_index, filestore, peptide, addH):
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(index, original_peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH):
+def peptide_refinement_and_scoring(index, rcd_num_loops, original_peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
 	new_filestore = filestore + '/4_SMINA_data'
 
 	# 1. Assemble peptide by mergin the peptide anchors and the middle part
 	assembled_peptide = new_filestore + '/01_assembled_peptides/assembled_' + str(index) + '.pdb'
-	if index > 0:
+	if index <= rcd_num_loops:
 		model_location = filestore + '/3_RCD_data/splits/model_' + str(index) + '.pdb'
 		Nterm_location = filestore + '/2_input_to_RCD/N_ter.pdb'
 		Cterm_location = filestore + '/2_input_to_RCD/C_ter.pdb'
 		merge_and_tidy_pdb([Nterm_location, model_location, Cterm_location], assembled_peptide)
 	else:
-		move_file(filestore + '/2_input_to_RCD/model_0.pdb', assembled_peptide)
+		copy_file(filestore + '/2_input_to_RCD/model_0.pdb', assembled_peptide)
 
 	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index, PTM_list = original_peptide.PTM_list)
 
@@ -158,9 +158,9 @@ def apegen(args):
 	# - Number of loops to optimize (that will pass as a result of a loop scoring function)
 	num_loops = int(args.num_loops_for_optimization)
 
-	# - In addition to RCD loops being refined and scored, the structural conformation of the peptide template is also included, untouched.
-	include_template_in_scoring = args.include_template_in_scoring
-	if include_template_in_scoring: num_loops -= 1
+	# The percentage of overall peptide conformations processed (defined by --num_loops_for_optimization flag) that will be coming from RCD sampling.
+	non_sampled_confs = int(np.rint((1 - args.sampling_ratio)*num_loops))
+	num_loops = int(np.rint(args.sampling_ratio*num_loops))
 
 	# - RCD dist tolerance: RCD tolerance (in angstroms) of inner residues when performing IK
 	RCD_dist_tol = args.RCD_dist_tol
@@ -285,7 +285,7 @@ def apegen(args):
 		# Perform RCD on the receptor given peptide:
 		if verbose: print("Performing RCD")
 		loop_indexes = receptor_template.RCD(peptide, RCD_dist_tol, rcd_num_loops, num_loops, 
-											 loop_score, include_template_in_scoring, filestore)
+											 loop_score, non_sampled_confs, filestore)
 
 		# Prepare receptor for scoring (generate .pdbqt for SMINA):
 		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
@@ -302,7 +302,7 @@ def apegen(args):
 						'/09_minimized_receptors', '/08_anchor_filtering', '/10_pMHC_complexes/']
 		initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
 		
-		arg_list = list(map(lambda pep_index: (pep_index, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
+		arg_list = list(map(lambda pep_index: (pep_index, rcd_num_loops, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
 						loop_indexes))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)

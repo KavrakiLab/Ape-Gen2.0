@@ -87,7 +87,7 @@ def align_2d(filestore):
 	aln.write(file='target_sequence-receptor_template.ali', alignment_format='PIR')
 	aln.write(file='target_sequence-receptor_template.pap', alignment_format='PAP')
 
-def model_receptor(allele_sequence, peptide_sequence, filestore):
+def model_receptor(allele_sequence, peptide_sequence, filestore, cv):
 	# if the modeller import was unsuccessful, quit
 	if (modeller_import == ImportError):
 		print("Error with importing Modeller: Make sure license key is correct.")
@@ -110,25 +110,22 @@ def model_receptor(allele_sequence, peptide_sequence, filestore):
 			best_score = alignments[0].score
 			best_record_list = []
 			best_record_list.append(seq_record.id)
-	if verbose(): print(best_record_list)
 	if verbose(): print("Closest match are the following alleles: ", best_record_list)
-
-	# Secondly, emphasizing more on the peptide binding pocket, we fetch the pdb code that has the peptide
-	# with the closest sequence similarity to the peptide to be modelled. This is coming from the hypothesis that
-	# this structure will have similar binding cleft to accomodate the peptide?
 
 	# This is repeated code btw, see if you can make a function for this, it would be amazing
 	if verbose(): print("Fetching now the most appropriate template that will host the peptide in question:")
-	templates = pd.read_csv("./helper_files/Template_Information_notation.csv")
-	templates = templates[templates['MHC'].isin(best_record_list)]
-	aligner = Align.PairwiseAligner()
-	aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
-	score_list = []
-	template_sequences = templates['peptide'].tolist()
-	for template_sequence in template_sequences:
-		score_list.append(aligner.score(peptide_sequence, template_sequence))
-	templates['peptide_score'] = score_list
-	templates = templates[templates['peptide_score'] == templates['peptide_score'].max()].dropna()
+	templates = pd.read_csv("./helper_files/Updated_template_information.csv")
+	if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
+
+	# MHC Similarity
+	sub_alleles = pd.unique(templates['MHC']).tolist()
+	sub_alleles.append("Allele")
+	similarity_matrix = pd.read_csv("./helper_files/" + str(len(peptide_sequence)) + "mer_similarity.csv")[sub_alleles]
+	similarity_matrix = similarity_matrix[similarity_matrix["Allele"].isin(best_record_list)].drop("Allele", axis=1).T.reset_index(drop=False)
+	similarity_matrix.columns = ['MHC', 'MHC_similarity']
+	templates = templates.merge(similarity_matrix, how='inner', on='MHC')
+
+	templates = templates[templates['MHC_similarity'] == templates['MHC_similarity'].max()].dropna()
 	result = templates.sample(n=1)
 	pdb_filename = result['pdb_code'].values[0]
 	new_allotype = result['MHC'].values[0]
@@ -248,7 +245,7 @@ class Receptor(object):
 		for seq_record in SeqIO.parse("./helper_files/MHC_data.fasta", "fasta"):
 			if seq_record.id == allotype:
 				if verbose(): print("Allotype found in our sequence DB! Modelling it through homology modelling:")
-				pdb_filename, new_allotype = model_receptor(str(seq_record.seq), peptide_sequence, filestore)
+				pdb_filename, new_allotype = model_receptor(str(seq_record.seq), peptide_sequence, filestore, cv)
 				return(cls(allotype=new_allotype, pdb_filename=pdb_filename))
 
 		print("Allotype not found in our sequence DB... Please check the list of supported allotypes (or pass down a fasta sequence instead.")
