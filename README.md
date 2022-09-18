@@ -86,6 +86,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 
 #### Major issues:
 - It seems that the Insertion/Mutation/Deletion part that builds the peptide in question (before it searches the space) is probabilistic. That would mean that each time, PDBFixer gives a different result. So it should be called many times instead of just 1, SMINA does not do serious optimization it seems...
+- Find another way for the case where we cannot find an appropriate template: Fetch a template with same sequence length if it exists and just replace. If there is not, fetch a template with one less and just do RCD?
 - Testing/Testing/Testing...
 
 ### PTMs:
