@@ -62,7 +62,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Index Variable is still not fixed properly, check `compute_anchor_tolerance` to see how it is. 
 - Taxonomy on what is a macro and what is a class method must be done at some point
 - Send an e-mail to Chacon lab for the RCD file that does not want to work
 - Wrap the anchor extraction/other things that can be wrapped in the Peptide/pMHC class from the initial part up to the RCD (but also in general) and put them in the macro file, they looks ugly.
@@ -86,7 +85,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- The template fetching needs probably a consensus score that fetches both by taking into account peptide similarity, but also MHC similarity...
+- It seems that the Insertion/Mutation/Deletion part that builds the peptide in question (before it searches the space) is probabilistic. That would mean that each time, PDBFixer gives a different result. So it should be called many times instead of just 1, SMINA does not do serious optimization it seems...
 - Testing/Testing/Testing...
 
 ### PTMs:
