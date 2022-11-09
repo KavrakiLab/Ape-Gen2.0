@@ -85,8 +85,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Change the DB file + the template files with the new one produced.
-- It seems that the Insertion/Mutation/Deletion part that builds the peptide in question (before it searches the space) is probabilistic. That would mean that each time, PDBFixer gives a different result. So it should be called many times instead of just 1, SMINA does not do serious optimization it seems...
+- Remove `addH` variable, and do pdb2pqr instead to keep the protonation state with only polar hydrogens.
 - Find another way for the case where we cannot find an appropriate template: Fetch a template with same sequence length if it exists and just replace. If there is not, add it: 2 cases, a 15-mer and a 14-mer in the DB, codes to add: 6VQ2, 4U6X
 - Testing/Testing/Testing...
 
