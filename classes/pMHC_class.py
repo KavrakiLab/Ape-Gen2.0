@@ -5,7 +5,8 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, i
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, select_models, move_file, 	   \
 											remove_file, verbose, add_missing_residues,            \
-											apply_mutations, filter_chains, anchor_alignment
+											apply_mutations, filter_chains, anchor_alignment,      \
+											replace_chains
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -112,9 +113,6 @@ class pMHC(object):
 		aa_list_in_question = list(sequence_in_question)
 		mutation_list = []
 
-		print(aa_list_ref)
-		print(aa_list_in_question)
-
 		i = 0
 		j = i + 1
 		while(i < len(sequence_in_question)):
@@ -126,9 +124,6 @@ class pMHC(object):
 				pass
 			i += 1
 			j += 1
-
-		print(mutation_list)
-		input()
 
 		# 2c. Apply mutations using the mutation list
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
@@ -347,8 +342,6 @@ class pMHC(object):
 		force.addPerParticleParameter("x0")
 		force.addPerParticleParameter("y0")
 		force.addPerParticleParameter("z0")
-		
-		#protein_particles = md.load(filename).top.select("backbone")
 
 		ppdb = PandasPdb()
 		ppdb.read_pdb(self.pdb_filename)
@@ -383,7 +376,10 @@ class pMHC(object):
 		if energy < best_energy:
 			best_energy = energy
 			path, file = os.path.split(self.pdb_filename)
-			r = PDBReporter(filestore + '/5_openMM_conformations/14_minimized_complexes/' + file, 1)
+			r = PDBReporter(filestore + '/5_openMM_conformations/10_pMHC_complexes/' + file, 1)
 			r.report(simulation, simulation.context.getState(getPositions=True, getEnergy=True))
-			
+		
+		# Rename the chains, for some reason it's chain B and not C
+		apply_function_to_file(replace_chains, filestore + '/5_openMM_conformations/10_pMHC_complexes/' + file, chain_from="B", chain_to="C")	
+
 		return best_energy 
