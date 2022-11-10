@@ -77,7 +77,7 @@ class Peptide(object):
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Updated_template_information.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Template_DB_information.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -139,6 +139,7 @@ class Peptide(object):
 		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
 
 		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score']].sort_values(by=['Similarity_score'], ascending=False).head(20))
+		#input()
 
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
@@ -215,10 +216,10 @@ class Peptide(object):
 
 		return False
 
-	def prepare_for_scoring(self, filestore, current_round, addH):
+	def prepare_for_scoring(self, filestore, current_round):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/04_pdbqt_peptides/peptide_" + str(self.index) + ".pdbqt"
-		clean = "lps" if addH == "all" else "nphs_lps"
+		clean = "lps"
 		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U " + clean + " -g -s > " + filestore + "/04_pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
 
 		# If the resulting .pdbqt is faulty, delete it. If it does not exist, it is also faulty, so skip whatever else. 
@@ -237,33 +238,32 @@ class Peptide(object):
 		else:
 			return False
 
-	def dock_score_with_SMINA(self, filestore, receptor, addH):
+	def dock_score_with_SMINA(self, filestore, receptor):
 
 		# SMINA docking and scoring
-		add_hydrogens = "True" if addH != "none" else "False"
 		self.pdb_filename =  filestore + "/06_scoring_results/model_" + str(self.index) + ".pdb"
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
-				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
-				  " --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --energy_range 100 --addH " + add_hydrogens + " --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
@@ -274,7 +274,7 @@ class Peptide(object):
 			  " > " + filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		move_file(receptor.pdb_filename, filestore + "/09_minimized_receptors/receptor_" + str(self.index) + ".pdb")    
 
-	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round):
+	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round, rcd_num_loops):
 
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(self.pdb_filename)
@@ -290,7 +290,7 @@ class Peptide(object):
 
 		# If difference is smaller than the tolerance, keep the file, else don't (exception for the native one, but it'll probably pass anyway)
 		anchor_difference = np.linalg.norm(pdb_peptide_anchors_xyz - peptide_template_anchors_xyz, axis=1)
-		if (np.all(anchor_difference < anchor_tol)) or (self.index == 0):
+		if (np.all(anchor_difference < anchor_tol)) or (self.index > rcd_num_loops):
 			
 			# Keep the scores of the remaining survivors
 			with open(self.pdb_filename, 'r') as peptide_handler:
@@ -320,7 +320,7 @@ class Peptide(object):
 			
 			return True
 
-	def fix_flexible_residues(self, filestore, receptor, current_round, addH):
+	def fix_flexible_residues(self, filestore, receptor, current_round):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
 		#minimized_receptor_loc = filestore + "/4_SMINA_data/09_minimized_receptors/receptor_" + str(self.index) + ".pdb"
@@ -368,7 +368,7 @@ class Peptide(object):
 			C_loc = (sub_pdb.loc[loc_indexes, 'atom_number'].values)[0]
 
 			# print(CA_loc, C_loc)
-			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc, addH)
+			matching = csp_solver(sub_edge_list, residue, atom_indexes, CA_loc, C_loc)
 			# print(matching)
 			# input()
 			if matching.shape[0] == 0: # Empty Solution

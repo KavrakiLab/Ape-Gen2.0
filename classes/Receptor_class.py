@@ -114,13 +114,14 @@ def model_receptor(allele_sequence, peptide_sequence, filestore, cv):
 
 	# This is repeated code btw, see if you can make a function for this, it would be amazing
 	if verbose(): print("Fetching now the most appropriate template that will host the peptide in question:")
-	templates = pd.read_csv("./helper_files/Updated_template_information.csv")
+	templates = pd.read_csv("./helper_files/Template_DB_information.csv")
 	if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
 	# MHC Similarity
 	sub_alleles = pd.unique(templates['MHC']).tolist()
 	sub_alleles.append("Allele")
-	similarity_matrix = pd.read_csv("./helper_files/" + str(len(peptide_sequence)) + "mer_similarity.csv")[sub_alleles]
+	similarity_matrix = pd.read_csv("./helper_files/" + str(len(peptide_sequence)) + "mer_similarity.csv")
+	similarity_matrix = similarity_matrix[sub_alleles]
 	similarity_matrix = similarity_matrix[similarity_matrix["Allele"].isin(best_record_list)].drop("Allele", axis=1).T.reset_index(drop=False)
 	similarity_matrix.columns = ['MHC', 'MHC_similarity']
 	templates = templates.merge(similarity_matrix, how='inner', on='MHC')
@@ -211,7 +212,7 @@ class Receptor(object):
 	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./helper_files/Updated_template_information.csv")
+		templates = pd.read_csv("./helper_files/Template_DB_information.csv")
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
@@ -269,13 +270,13 @@ class Receptor(object):
 		flexible_residues = file.readline().strip()
 		return flexible_residues
 
-	def prepare_for_scoring(self, filestore, addH, index=""):
+	def prepare_for_scoring(self, filestore, index=""):
 
 		prep_receptor_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
 		pdbqt_to_pdb_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
 		self.pdbqt_filename = filestore + "/receptor_for_smina" + index + ".pdbqt"
 
-		clean = "lps" if addH == "all" else "nphs_lps"
+		clean = "lps"
 		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U" + clean + " > " + filestore + "/prepare_receptor4.log 2>&1"], shell=True)
 		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/receptor_for_smina_temp" + index + ".pdb > " + filestore + "/pdbqt_to_pdb.log 2>&1"], shell=True)
 

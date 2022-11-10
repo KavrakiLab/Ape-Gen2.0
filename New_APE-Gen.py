@@ -24,56 +24,14 @@ from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
 
-def rescoring_after_openmm(conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors):
+def prepare_for_openmm(conf_index, filestore, peptide):
 
-	new_filestore = filestore + '/5_openMM_conformations'
-
-	# 1. Rename B chain to C chain
-	apply_function_to_file(replace_chains, new_filestore + "/14_minimized_complexes/pMHC_" + str(conf_index) + ".pdb", chain_from="B", chain_to="C")
-
-	# 2. Separate the peptide from the MHC
-	receptor_file, peptide_file = split_receptor_and_peptide(new_filestore + "/14_minimized_complexes/pMHC_" + str(conf_index) + ".pdb")
-
-	# 3. Prepare Receptor for Scoring
-	apply_function_to_file(remove_remarks_and_others_from_pdb, receptor_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-
-	receptor = Receptor.frompdb(receptor_file)
-	receptor.doMinimization = True
-	receptor.useSMINA = True
-	receptor.prepare_for_scoring(new_filestore + '/09_minimized_receptors', addH="all", index=str(conf_index))
-
-	apply_function_to_file(remove_remarks_and_others_from_pdb, peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
-
-	apply_function_to_file(replace_HETATM, peptide_file)
-	
-	peptide = Peptide.frompdb(peptide_file, secondary_anchors = tolerance_anchors, peptide_index=conf_index)
-	peptide.sequence = re.sub('[a-z]', '', peptide.sequence) # Remove PTMs from the sequence
-
-	# 4. Re-score with SMINA (enforce no further minimization)
-	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, current_round, addH="all")
-	if(peptide_is_not_valid): return
-
-	peptide.score_with_SMINA(new_filestore, receptor)
-
-	# 5. Anchor filtering step
-	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round)
-	if(peptide_is_not_valid): return
-
-	# 6. Create the peptide + MHC ensemble files (Already have those but ok...)
-	peptide.create_peptide_receptor_complexes(new_filestore, receptor)
-
-	# Done!
-	return
-
-def prepare_for_openmm(conf_index, filestore, peptide, addH):
-
-	# 1. Run Receptor through PDBFixer, as the non-polar hydrogens could be in wrong places (they do not participate in the SMINA Minimization process):
+	# 1. Run receptors through PDBFixer, as the non-polar hydrogens could be in wrong places:
 	receptor = Receptor.frompdb(filestore + '/4_SMINA_data/09_minimized_receptors/receptor_' + str(conf_index) + ".pdb")
 	add_sidechains(receptor.pdb_filename, filestore, add_hydrogens="Yes", keep_IDs=True)
 
-	if addH != "all":
-		add_sidechains(filestore + '/4_SMINA_data/08_anchor_filtering/peptide_' + str(conf_index) + ".pdb", 
-				   	   filestore, add_hydrogens="Yes", keep_IDs=True)
+	add_sidechains(filestore + '/4_SMINA_data/08_anchor_filtering/peptide_' + str(conf_index) + ".pdb", 
+				   filestore, add_hydrogens="Yes", keep_IDs=True)
 
 	# 2. Unify peptide and receptor together and create a new pMHC complex
 	pMHC_conformation = filestore + "/5_openMM_conformations/11_pMHC_before_sim/pMHC_" + str(conf_index) + ".pdb"
@@ -88,7 +46,7 @@ def prepare_for_openmm(conf_index, filestore, peptide, addH):
 	# Done!
 	return
 
-def peptide_refinement_and_scoring(index, rcd_num_loops, original_peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH):
+def peptide_refinement_and_scoring(index, rcd_num_loops, original_peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round):
 
 	# Routine that refines and scores a peptide/receptor pair with SMINA/Vinardo
 	new_filestore = filestore + '/4_SMINA_data'
@@ -106,7 +64,7 @@ def peptide_refinement_and_scoring(index, rcd_num_loops, original_peptide, files
 	peptide = Peptide.frompdb(assembled_peptide, secondary_anchors=tolerance_anchors, peptide_index=index, PTM_list = original_peptide.PTM_list)
 
 	# 2. Now that the peptide is assembled, Fill in the sidechains with pdbfixer
-	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=index, add_hydrogens=addH)
+	peptide.pdb_filename = add_sidechains(peptide.pdb_filename, new_filestore, peptide_idx=index)
 
 	# 3. Do PTMs
 	peptide_is_not_valid = peptide.perform_PTM(new_filestore, current_round)
@@ -114,19 +72,19 @@ def peptide_refinement_and_scoring(index, rcd_num_loops, original_peptide, files
 
 	# 4. Score with SMINA
 	# 4a. .pdb to .pdbqt transformation using autodocktools routines (very good for filtering bad conformations)
-	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, current_round, addH)
+	peptide_is_not_valid = peptide.prepare_for_scoring(new_filestore, current_round)
 	if(peptide_is_not_valid): return
 
 	# 4b. Optimize and score with SMINA (or other options, depending on args)
-	peptide.dock_score_with_SMINA(new_filestore, receptor, addH)
+	peptide.dock_score_with_SMINA(new_filestore, receptor)
 
 	# 5. Anchor filtering (based on anchor tolerance argument) (improvement from previous version)
-	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round)
+	peptide_is_not_valid = peptide.compute_anchor_tolerance(new_filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round, rcd_num_loops)
 	if(peptide_is_not_valid): return
 
 	# 6. Fix flexible residue co-ordinates if receptor is flexible
 	if receptor.doMinimization:
-		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, current_round, addH)
+		peptide_is_not_valid = peptide.fix_flexible_residues(new_filestore, receptor, current_round)
 		if(peptide_is_not_valid): return
 
 	# 7. Create the peptide + MHC ensemble files
@@ -208,9 +166,6 @@ def apegen(args):
 	# --anchor_selection: Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)
 	anchor_selection = args.anchor_selection
 
-	# --addH: Adding hydrogens (all/polar only/no hydrogens)
-	addH = args.addH
-
 	# --cv: ONLY FOR TESTING (to be removed in the final version)
 	cv = args.cv
 
@@ -255,8 +210,6 @@ def apegen(args):
 	#    From my understanding, PDBFixer when given an MHC with no hydrogens will mess smth up not in terms of atoms, but in terms of bonds. 
 	#    Let's prevent users from actually doing this.
 	# D. If the number of loops is more than 5000, we should remove possibility from modelling (and this I guess can be manually overriden) 
-	if(addH == 'none') and (score_with_openmm == True):
-		sys.exit("\nTo use the openMM energy minimization routine, you need to provide polar/all hydrogens input.")
 	if (('phosphorylate 1' in PTM_list) or ('phosphorylate ' + str(len(peptide.sequence)) in PTM_list)) and (score_with_openmm):
 		sys.exit("\nERROR: Phosphorylation in N-terminus or C-terminus and openMM optimization is NOT supported. Force Field parameters are not released yet. Please omit OpenMM step for modelling this type of PTM.")
 	for PTM in PTM_list:
@@ -280,7 +233,7 @@ def apegen(args):
 		receptor_template.align(reference=peptide_template, filestore=filestore)
 		if verbose: print("Preparing input to RCD")
 		receptor_template.prepare_for_RCD_v3(reference=peptide_template, peptide=peptide, filestore=filestore)
-		add_sidechains(receptor_template.pdb_filename, filestore, addH, keep_IDs=True)
+		add_sidechains(receptor_template.pdb_filename, filestore, keep_IDs=True)
 
 		# Perform RCD on the receptor given peptide:
 		if verbose: print("Performing RCD")
@@ -291,8 +244,8 @@ def apegen(args):
 		if verbose: print("Preparing receptor for scoring (generate .pdbqt for SMINA)")
 		initialize_dir(filestore + '/4_SMINA_data')
 		receptor = receptor_template.receptor
-		add_sidechains(receptor.pdb_filename, filestore, add_hydrogens=addH)
-		receptor.prepare_for_scoring(filestore + "/4_SMINA_data", addH=addH)
+		add_sidechains(receptor.pdb_filename, filestore)
+		receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
 		if verbose: print("Performing peptide refinement and scoring. This may take a while...")
@@ -302,7 +255,7 @@ def apegen(args):
 						'/09_minimized_receptors', '/08_anchor_filtering', '/10_pMHC_complexes/']
 		initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
 		
-		arg_list = list(map(lambda pep_index: (pep_index, rcd_num_loops, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round, addH), 
+		arg_list = list(map(lambda pep_index: (pep_index, rcd_num_loops, peptide, filestore, receptor, tolerance_anchors, peptide_template_anchors_xyz, anchor_tol, current_round), 
 						loop_indexes))
 		with WorkerPool(n_jobs=num_cores) as pool:
 			results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
@@ -338,7 +291,7 @@ def apegen(args):
 			if verbose: print("Preparing input for OpenMM optimization. This may take a while...")
 
 			# First prepare for OpenMM
-			arg_list = list(map(lambda e: (e, filestore, peptide, addH), successful_confs))
+			arg_list = list(map(lambda e: (e, filestore, peptide), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(prepare_for_openmm, arg_list, progress_bar=verbose)
 
@@ -360,13 +313,14 @@ def apegen(args):
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
 												leave=leave_progress_bar, disable=disable_progress_bar):
 					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
+					with open(filestore + "/5_openMM_conformations/05_per_peptide_results/peptide_" + str(conf_index) + ".log", 'w') as peptide_handler:
+						peptide_handler.write(str(current_round) + "," + str(conf_index) + ",Successfully Modeled," + str(best_energy) + "\n")
 
 			# Rescoring and re-filtering resulting conformations
-			if verbose: print("\nRescoring and re-filtering resulting conformations:")
-			arg_list = list(map(lambda conf_index: (conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors), successful_confs))
-			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
-				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=verbose)
-
+			#if verbose: print("\nRescoring and re-filtering resulting conformations:")
+			#arg_list = list(map(lambda conf_index: (conf_index, filestore, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors), successful_confs))
+			#with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
+			#	results = pool.map(rescoring_after_openmm, arg_list, progress_bar=verbose)
 
 			copy_batch_of_files(filestore + '/5_openMM_conformations/10_pMHC_complexes/',
 								filestore + '/6_final_conformations/',
