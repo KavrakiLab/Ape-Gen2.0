@@ -240,6 +240,8 @@ class pMHC(object):
 			best_indexes = korp_res.sort_values(by=['RMSD'])['Loop'].head(num_loops).astype(int).tolist()
 		else:
 			best_indexes = random.sample(range(rcd_num_loops), num_loops)
+		best_indexes = [idx + 1 for idx in best_indexes]
+		
 		# Score loops if the user wants it to
 		if verbose(): print("RCD done!")
 
