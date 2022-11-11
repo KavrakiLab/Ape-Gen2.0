@@ -352,6 +352,7 @@ def apegen(args):
 				print('No conformations were produced... Tolerance is quite high so something else is wrong... Aborting...')
 				sys.exit(0)
 			print('No conformations were produced... Force restarting with increased anchor tolerance = ' + str(anchor_tol))
+			receptor_template.pdb_filename = receptor_template_file
 		else:
 			# Storing the best conformation
 			best_energy = results_csv['Affinity'].astype('float').min()
