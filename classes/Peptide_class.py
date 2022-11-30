@@ -134,7 +134,11 @@ class Peptide(object):
 		score_list_norm = score_list/self_score
 		templates['Peptide_similarity'] = score_list_norm
 
-		# 2c. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
+		# 2c. Try by organism first; if that does not bring options, try all!	
+		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty:
+			templates = templates[templates['MHC'].str[:3] == receptor_allotype[:3]]
+			
+		# 2d. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
 		# If there are duplicate results, select at one at random!
 		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
 
