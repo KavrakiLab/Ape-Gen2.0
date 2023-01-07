@@ -19,7 +19,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
 											verbose, extract_anchors, count_number_of_atoms,       \
-											score_sequences, predict_anchors, anchor_alignment
+											score_sequences, predict_anchors_PMBEC, anchor_alignment
 
 from classes.pMHC_class import pMHC
 
@@ -77,7 +77,7 @@ class Peptide(object):
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Template_DB_information.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Pandora_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -86,21 +86,22 @@ class Peptide(object):
 		# 1) Feature filtering to predict which are the anchors (when they are not given)
 		if anchors == "":	
 			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-			anchors, anchor_status = predict_anchors(self.sequence, receptor_allotype)
+			anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
 			if verbose():
 				if anchor_status == "Not Known":
-					print("Receptor allotype has no known MHC binding motif... Anchors are defined as canonical!")
+					print("Receptor allotype has no known SMM matrix... Anchors are defined as canonical!")
 				else:
-					print("Receptor allotype has a known MHC binding motif!")
+					print("Receptor allotype has a SMM matrix!")
 
 		if verbose(): print("Predicted anchors for the peptide: ", anchors)
-
+		
 		# Bring the templates having same anchor distance as the give peptide-MHC (NOTE: Calculate this offline as an improvement?)
 		int_anchors = [int(pos) for pos in anchors.split(",")]
 		diff = abs(int_anchors[0] - int_anchors[1]) 
 		templates['anchor_diff'] = templates['Major_anchors'].apply(lambda x: x.split(","))
 		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
-		templates = templates[templates['anchor_diff'] == diff]
+		if anchor_status == "Known":
+			templates = templates[templates['anchor_diff'] == diff]
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs + peptide similarity
 		# This helps mitigating the effect of overfitting to a peptide sequence or an allele
@@ -115,26 +116,41 @@ class Peptide(object):
 
 		templates['Major_anchor_1'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[0].astype(int)
 		templates['Major_anchor_2'] = templates['Major_anchors'].apply(lambda x: x.split(",")).str[1].astype(int)
-		templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
-		templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
+
+		if anchor_status == "Known":
+			templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
+			templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
+		else:
+			templates['Anchor_diff_1'] = 0
+			templates['Anchor_diff_2'] = 0
 
 		# 2b. Peptide similarity between anchors:
-		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
-		Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
-		Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
-		for i, template_sequence in enumerate(template_sequences):
-			temp_sequence_in_question, temp_template_sequence = anchor_alignment(self.sequence, template_sequence, 
+		if anchor_status == "Known":
+			blosum_62 = Align.substitution_matrices.load("BLOSUM62")
+			Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
+			Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
+			for i, template_sequence in enumerate(template_sequences):
+				temp_sequence_in_question, temp_template_sequence = anchor_alignment(self.sequence, template_sequence, 
 																				 Anchor_diff_1[i], Anchor_diff_2[i])
-			score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
+				score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
 											  matrix=blosum_62, gap_penalty=0))
-		self_score = score_sequences(self.sequence, self.sequence, 
+			self_score = score_sequences(self.sequence, self.sequence, 
 									 matrix=blosum_62, gap_penalty=0)
-		score_list_norm = score_list/self_score
+		else:
+			aligner = Align.PairwiseAligner()
+			aligner.open_gap_score = -0.5
+			aligner.extend_gap_score = -0.1
+			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
+			for template_sequence in template_sequences:
+				score_list.append(aligner.score(self.sequence, template_sequence))
+			self_score = aligner.score(self.sequence, self.sequence)
+
+		score_list_norm = [score / self_score for score in score_list]
 		templates['Peptide_similarity'] = score_list_norm
 
-		# 2c. Try by organism first; if that does not bring options, try all!	
+		# 2c. Try filtering by organism first; if that does not bring options, try all!	
 		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty:
 			templates = templates[templates['MHC'].str[:3] == receptor_allotype[:3]]
 			

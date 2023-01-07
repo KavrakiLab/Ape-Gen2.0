@@ -114,7 +114,7 @@ def model_receptor(allele_sequence, peptide_sequence, allotype, filestore, cv):
 
 	# This is repeated code btw, see if you can make a function for this, it would be amazing
 	if verbose(): print("Fetching now the most appropriate template that will host the peptide in question:")
-	templates = pd.read_csv("./helper_files/Template_DB_information.csv")
+	templates = pd.read_csv("./helper_files/Pandora_DB.csv")
 	if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
 	# Peptide Similarity
@@ -216,7 +216,7 @@ class Receptor(object):
 	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./helper_files/Template_DB_information.csv")
+		templates = pd.read_csv("./helper_files/Pandora_DB.csv")
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
