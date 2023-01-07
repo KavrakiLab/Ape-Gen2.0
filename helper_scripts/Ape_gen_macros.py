@@ -467,6 +467,74 @@ def extract_anchors(peptide, MHC, frequencies):
 
 	return ",".join([anchor_1, anchor_2])
 
+def extract_anchors_PMBEC(peptide, MHC, frequencies):
+	
+	# Load and set the SMM matrix
+	smm_matrix = pd.read_csv('./helper_files/PMBEC/' + MHC + '.txt', sep = '\t', skiprows=1, header = None, nrows=20).transpose()
+	new_header = smm_matrix.iloc[0] #grab the first row for the header
+	smm_matrix = smm_matrix[1:] #take the data less the header row
+	smm_matrix.columns = new_header #set the header row as the df header
+	smm_matrix = smm_matrix.reset_index().rename(columns={'index': 'position'})
+
+	matrix = frequencies[(frequencies['allele'] == MHC) & (frequencies['length'] == 9)]
+	
+	# N-termini_candidate_1
+	first_part_of_peptide = peptide[:3]
+	pep_sequence = list(first_part_of_peptide)
+
+	potential_pos_11 = smm_matrix[smm_matrix['position'] == 2][pep_sequence[0]].values[0]
+	inertia_pos_11 = smm_matrix[smm_matrix['position'] == 1][pep_sequence[0]].values[0]
+	will_11 = potential_pos_11 - inertia_pos_11
+	potential_12 = smm_matrix[smm_matrix['position'] == 3][pep_sequence[1]].values[0]
+	inertia_12 = smm_matrix[smm_matrix['position'] == 2][pep_sequence[1]].values[0]
+	will_12 = potential_12 - inertia_12
+	potential_pos_13 = smm_matrix[smm_matrix['position'] == 4][pep_sequence[2]].values[0]
+	inertia_pos_13 = smm_matrix[smm_matrix['position'] == 3][pep_sequence[2]].values[0]
+	will_13 = potential_pos_13 - inertia_pos_13
+	
+	# N-termini_candidate_3
+	first_part = matrix[(matrix['position'].isin([1,2,3,4,5]))]
+	anchor_1 = first_part.iloc[:, 5:].max(1).argmax() + 1
+	if anchor_1 in [1, 4, 5]: # This is because it probably cannot happen
+		anchor_1 = 2
+	
+	first_part_of_peptide = peptide[:(anchor_1 + 2)]
+	pep_sequence = list(first_part_of_peptide)
+
+	inertia_pos_31 = smm_matrix[smm_matrix['position'] == 1][pep_sequence[0]].values[0]
+	potential_32 = smm_matrix[smm_matrix['position'] == anchor_1 - 1][pep_sequence[anchor_1 - 1]].values[0]
+	inertia_32 = smm_matrix[smm_matrix['position'] == anchor_1][pep_sequence[anchor_1 - 1]].values[0]
+	will_32 = potential_32 - inertia_32
+	potential_pos_33 = smm_matrix[smm_matrix['position'] == anchor_1][pep_sequence[anchor_1]].values[0]
+	inertia_pos_33 = smm_matrix[smm_matrix['position'] == anchor_1 + 1][pep_sequence[anchor_1]].values[0]
+	will_33 = potential_pos_33 - inertia_pos_33
+	
+	# C-termini_candidate
+	second_part_of_peptide = peptide[7:]
+	second_part = matrix[(matrix['position'] >= 8) & (matrix['position'] <= len(peptide))]
+	pep_sequence = list(second_part_of_peptide)
+	stability_c = smm_matrix[smm_matrix['position'] == 9][pep_sequence[len(peptide) - 8]].values[0]
+	min_will_c = float("inf")
+	arg_will_c = 0
+	for pos in range(8, len(peptide)):
+		potential_pos_c = smm_matrix[smm_matrix['position'] == 9][pep_sequence[pos - 8]].values[0]
+		intertia_pos_c = smm_matrix[smm_matrix['position'] == 8][pep_sequence[pos - 8]].values[0]
+		will_pos_c = potential_pos_c - intertia_pos_c
+		if min_will_c > will_pos_c:
+			min_will_c = will_pos_c
+			arg_will_c = pos
+	
+	anchor_1 = "2"
+	if (will_11 < -0.3) and (will_12 < 0.05) and (will_13 < -0.06):
+		anchor_1 = "1"
+	if (inertia_pos_31 > 0.0) and (will_32 < 0.75) and (will_33 < -0.35):
+		anchor_1 = "3"
+	anchor_2 = str(len(peptide))
+	if (stability_c > 0.0) and (will_list_c < -0.5):
+		anchor_2 = str(arg_will_c)
+	
+	return ",".join([anchor_1, anchor_2])
+
 def predict_anchors(peptide, MHC):
 
 	frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
@@ -476,6 +544,23 @@ def predict_anchors(peptide, MHC):
 
 	if MHC in frequencies_alleles:
 		anchors = extract_anchors(peptide, MHC, frequencies)
+		anchor_status = "Known"
+	else:
+		anchors = "2," + str(len(peptide))
+		anchor_status = "Not Known"
+	return anchors, anchor_status
+
+def predict_anchors_PMBEC(peptide, MHC):
+	
+	frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
+	frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
+	frequencies['X'] = np.zeros(frequencies.shape[0])
+
+	frequencies_alleles = os.listdir('./helper_files/PMBEC/') 
+	frequencies_alleles = [x.split('.')[0] for x in frequencies_alleles]
+	
+	if MHC in frequencies_alleles:
+		anchors = extract_anchors_PMBEC(peptide, MHC, frequencies)
 		anchor_status = "Known"
 	else:
 		anchors = "2," + str(len(peptide))
