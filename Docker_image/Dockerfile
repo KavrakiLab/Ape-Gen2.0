@@ -34,10 +34,9 @@ RUN apt-get update && \
         wget \
         vim
 
-
 RUN ["/bin/bash", "-c", "wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"]
 RUN chmod 0755 Miniconda3-latest-Linux-x86_64.sh
-RUN ./Miniconda3-latest-Linux-x86_64.sh -b -p /conda
+RUN bash Miniconda3-latest-Linux-x86_64.sh -b -p /conda
 ENV PATH "/conda/bin:$PATH"
 
 # environment.yml has pdbfixer, numpy, mdtraj and openmm
@@ -45,7 +44,6 @@ COPY ./Docker_image/environment.yml /environment.yml
 RUN conda env create -f /environment.yml
 RUN echo "source activate apegen" >> ~/.bashrc
 ENV PATH "/conda/envs/apegen/bin:$PATH"
-
 
 # This is manual, but won't work
 #RUN conda create --name apegen python=3.6 \
@@ -77,8 +75,7 @@ RUN pip install pdb-tools
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 ADD . $HOME/data/
-RUN mkdir -p $HOME/data/RCD_required_files
-
+RUN ls /data/
 # replace files that cause warnings and errors
 # COPY /replacement_files/replace_files.sh /replace_files.sh
 # RUN echo "sh /replace_files.sh" >> ~/.bashrc
@@ -88,14 +85,15 @@ RUN conda install -c intel mkl
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/conda/lib/"
 RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
     cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin && \
-    cp RCD_v1.40_Linux_20190228/korp6Dv1.bin $HOME/data/RCD_required_files/korp6Dv1.bin && \
-    cp RCD_v1.40_Linux_20190228/dunbrack.bin $HOME/data/RCD_required_files/dunbrack.bin
+    cp RCD_v1.40_Linux_20190228/dunbrack.bin /data/RCD_required_files/dunbrack.bin
+
+#WORKDIR /data
+
+RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp|grep Korp6Dv1.txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
+    cp Korp6Dv1/korp6Dv1.bin /data/RCD_required_files/korp6Dv1.bin && \
+    cp Korp6Dv1/bin/korpe /data/RCD_required_files/korpe
 
 WORKDIR /data
-
-#RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp | grep Korp6Dv1.txz #|grep uk-button | cut -f4 -d\"` | tar Jxf - && \
-#    cp ./Korp6Dv1/korp6Dv1.bin ./RCD_required_files/korp6Dv1.bin && \
-#    rm -r ./Korp6Dv1
 
 ENTRYPOINT ["bash"]
 
