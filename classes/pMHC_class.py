@@ -225,16 +225,21 @@ class pMHC(object):
 		loops.close()
 
 		# Call RCD
-		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/RCD_required_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " --bench loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_proper_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_proper_rmsd.txt"], shell=True)
+		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/helper_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " --bench loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_proper_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_proper_rmsd.txt"], shell=True)
 
 		# Move files to back to destination folder
 		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_proper_")
 		move_batch_of_files('./', '../3_RCD_data/', query="results")
 		os.chdir("../3_RCD_data/")
 
-		korp_res = pd.read_csv("anchored_pMHC_proper_rmsd.txt", sep = " ",  comment='#', header=None)
+		korp_res = pd.read_csv("anchored_pMHC_proper_rmsd.txt", sep = " ", comment='#', header=None)
 		korp_res.columns = ['Loop', 'RMSD', 'Bump', 'BumpEx', 'BumpIn', 'Energy']
-		if loop_score in ['KORP', 'ICOSA']:
+		if loop_score == 'KORP':
+			call([pwd + "/RCD_required_files/korpe ../2_input_to_RCD/anchored_pMHC_proper.pdb --loops anchored_pMHC_proper_closed.pdb --score_file " + pwd + "/RCD_required_files/korp6Dv1.bin -e 5 -o korp_res >> korp.log 2>&1 && awk '{$1=$1};1' korp_res.txt > korp_tmp.txt && mv korp_tmp.txt korp_res.txt"], shell=True)
+			korp_res = pd.read_csv("korp_res.txt", sep = " ", comment='#', header=None)
+			korp_res.columns = ['Loop', 'Energy']
+			best_indexes = korp_res[korp_res['Loop'] != 0].sort_values(by=['Energy'])['Loop'].head(num_loops).astype(int).tolist()
+		elif loop_score == 'ICOSA':
 			best_indexes = korp_res.sort_values(by=['Energy'])['Loop'].head(num_loops).astype(int).tolist()
 		elif loop_score == 'RMSD':
 			best_indexes = korp_res.sort_values(by=['RMSD'])['Loop'].head(num_loops).astype(int).tolist()
