@@ -35,7 +35,7 @@ Not sure why this is happening in autodocktools, will see if I can manually over
 Secondly, to give a valid MODELLER key, one needs to go to:
 
 ```
-cd /conda/envs/apegen/lib/modeller-10.2/modlib/modeller/
+cd /conda/envs/apegen/lib/modeller-10.4/modlib/modeller/
 ```
 
 and modify the lines of `config.py` with a valid MODELLER key. Contact the lab to get a valid key.
@@ -62,11 +62,12 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Add pdb2pqr for protonation.
 - Taxonomy on what is a macro and what is a class method must be done at some point
 - Send an e-mail to Chacon lab for the RCD file that does not want to work
-- Wrap the anchor extraction/other things that can be wrapped in the Peptide/pMHC class from the initial part up to the RCD (but also in general) and put them in the macro file, they looks ugly.
+- Wrap the anchor extraction/other things that can be wrapped in the Peptide/pMHC class from the initial part up to the RCD (but also in general) and put them in the macro file, they look ugly.
 - Put a check so that if a peptide template with an MHC that is the same as the input allotype is found, don't bother fetching smth different, and just assign the same template as the receptor (that would require flipping the template selection order though). 
-- `_A`s and `_B`s need to go from the templates, I should be keeping only the As
+- `_A`s and `_B`s need to go from the templates, I should be keeping only the As (rm files from history)
 - I need to clean the dataframe fields. There are many that are basically useless, or I compute many while executing the algorithm, and pre-computation of those would be much better. 
 - Convert macros to the way they previously were, or make them class methods if they concern exclusively a class. 
 - `successful_conformations_statistics.csv` correction to `successfull`
@@ -76,7 +77,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina).
 - Add `num_of_rounds` in homology modelling as an argument. 
 - Make function in the places where there is repeated code
-- Add `number_of_tries` parameter to OpenMM (maybe also add the Langevin integrator patameters?)
+- Add `number_of_tries` parameter to OpenMM
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?)
 - The `receptor_template_file` variable in Section 1b is questionable, investigate more
 - Consider peptide methods which receptor is an input to be transferred to the `pMHC_class`, and a pMHC object defined
@@ -85,7 +86,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Remove `addH` variable, and do pdb2pqr instead to keep the protonation state with only polar hydrogens.
+- Remove `addH` variable
 - Find another way for the case where we cannot find an appropriate template: Fetch a template with same sequence length if it exists and just replace. If there is not, add it: 2 cases, a 15-mer and a 14-mer in the DB, codes to add: 6VQ2, 4U6X
 - Testing/Testing/Testing...
 
