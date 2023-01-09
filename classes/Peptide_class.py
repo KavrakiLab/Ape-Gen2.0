@@ -77,7 +77,7 @@ class Peptide(object):
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Pandora_DB.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -102,6 +102,8 @@ class Peptide(object):
 		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
 		if anchor_status == "Known":
 			templates = templates[templates['anchor_diff'] == diff]
+		else:
+			templates = templates[templates['peptide_length'] == sequence_length]
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs + peptide similarity
 		# This helps mitigating the effect of overfitting to a peptide sequence or an allele
@@ -140,7 +142,7 @@ class Peptide(object):
 									 matrix=blosum_62, gap_penalty=0)
 		else:
 			aligner = Align.PairwiseAligner()
-			aligner.open_gap_score = -0.5
+			aligner.open_gap_score = -2
 			aligner.extend_gap_score = -0.1
 			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
 			for template_sequence in template_sequences:
@@ -170,7 +172,10 @@ class Peptide(object):
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
 		template_major_anchors = [int(anchor) for anchor in final_selection['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
 		template_secondary_anchors = [int(anchor) for anchor in final_selection['Secondary_anchors'].apply(lambda x: x.split(",")).values[0]]
-		peptide_primary_anchors = int_anchors
+		if anchor_status == "Known": 
+			peptide_primary_anchors = int_anchors
+		else:
+			peptide_primary_anchors = template_major_anchors
 
 		# 4) Secondary anchors adjustment!
 		# Filtering secondary anchors that won't make sense give the left/right tilt

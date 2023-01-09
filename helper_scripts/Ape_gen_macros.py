@@ -530,7 +530,7 @@ def extract_anchors_PMBEC(peptide, MHC, frequencies):
 	if (inertia_pos_31 > 0.0) and (will_32 < 0.75) and (will_33 < -0.35):
 		anchor_1 = "3"
 	anchor_2 = str(len(peptide))
-	if (stability_c > 0.0) and (will_list_c < -0.5):
+	if (stability_c > 0.0) and (min_will_c < -0.5):
 		anchor_2 = str(arg_will_c)
 	
 	return ",".join([anchor_1, anchor_2])
