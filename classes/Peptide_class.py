@@ -89,14 +89,18 @@ class Peptide(object):
 		# 1) Feature filtering to predict which are the anchors (when they are not given)
 		if anchors == "":	
 			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-			anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
+			if len(self.sequence) <= 7:
+				(anchors, anchor_status) = ("2,7", "Not Known")
+				print("Peptide sequence is very small to use SMM matrices!") 
+			else:
+				anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
 			if verbose():
-				if anchor_status == "Not Known":
-					print("Receptor allotype has no known SMM matrix... Anchors are defined as canonical!")
+				if anchor_status == "Not Known" or len(self.sequence) <= 7:
+					print("SMM matrices could NOT be used... Defaulting to peptide sequence alignment")
 				else:
 					print("Receptor allotype has a SMM matrix!")
 
-		if verbose(): print("Predicted anchors for the peptide: ", anchors)
+		if verbose() and anchor_status == "Known": print("Predicted anchors for the peptide: ", anchors)
 		
 		# Bring the templates having same anchor distance as the give peptide-MHC (NOTE: Calculate this offline as an improvement?)
 		int_anchors = [int(pos) for pos in anchors.split(",")]
@@ -105,8 +109,6 @@ class Peptide(object):
 		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
 		if anchor_status == "Known":
 			templates = templates[templates['anchor_diff'] == diff]
-		##else:
-		##	templates = templates[templates['peptide_length'] == sequence_length]
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs + peptide similarity
 		# This helps mitigating the effect of overfitting to a peptide sequence or an allele
@@ -147,11 +149,11 @@ class Peptide(object):
 			tilted_sequences_list = []
 			tilted_template_sequences_list = []
 			for i, template_sequence in enumerate(template_sequences):
-				alignments = pairwise2.align.localds(self.sequence, template_sequence, blosum_62, -1000, -0.5)
+				alignments = pairwise2.align.localds(self.sequence, template_sequence, blosum_62, -1000, -5)
 				try:
 					temp_sequence_in_question = alignments[0].seqA
 					temp_template_sequence = alignments[0].seqB
-					score_list.append(alignments[0].score)
+					score_list.append(alignments[0].score - (temp_sequence_in_question + temp_template_sequence).count('-')*2)
 					(temp_anchor_1, temp_anchor_2) = calculate_anchors_given_alignment(temp_sequence_in_question, temp_template_sequence, anchor_1_list[i], anchor_2_list[i])
 				except IndexError:
 					temp_sequence_in_question = ''
@@ -165,14 +167,14 @@ class Peptide(object):
 			templates['Anchor_diff_2'] = [0] * len(anchor_1_diff_list)
 			templates['Tilted_sequence'] = tilted_sequences_list
 			templates['Tilted_template_sequence'] = tilted_template_sequences_list
-			alignments = pairwise2.align.localds(self.sequence, self.sequence, blosum_62, -1000, -0.5)
+			alignments = pairwise2.align.localds(self.sequence, self.sequence, blosum_62, -1000, -5)
 			self_score = alignments[0].score
 
 		score_list_norm = [score / self_score for score in score_list]
 		templates['Peptide_similarity'] = score_list_norm
 
 		# 2c. Try filtering by organism first; if that does not bring options, try all!	
-		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty:
+		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty and anchor_status == "Known":
 			templates = templates[templates['MHC'].str[:3] == receptor_allotype[:3]]
 			
 		# 2d. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
@@ -202,6 +204,7 @@ class Peptide(object):
 			peptide_primary_anchors = int_anchors
 		else:
 			peptide_primary_anchors = template_major_anchors
+			peptide_primary_anchors[1] = template_major_anchors[1] - (len(tilted_sequence) - len(tilted_sequence.rstrip('-'))) # This to adjust the C-terminus anchor when the template is larger in size
 
 		# 5) Secondary anchors adjustment!
 		# Filtering secondary anchors that won't make sense give the left/right tilt
