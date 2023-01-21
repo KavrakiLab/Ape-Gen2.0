@@ -5,8 +5,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file, i
 											all_one_to_three_letter_codes, replace_CONECT_fields,  \
 											merge_connect_fields, select_models, move_file, 	   \
 											remove_file, verbose, add_missing_residues,            \
-											apply_mutations, filter_chains, anchor_alignment,      \
-											replace_chains
+											apply_mutations, filter_chains, replace_chains
 
 from biopandas.pdb import PandasPdb
 import pandas as pd
@@ -103,10 +102,11 @@ class pMHC(object):
 
 		# 2. Mutate
 
-		# 2a. First align the sequences in terms of anchors
-		anchor_2_diff = anchor_2_ref - len(reference.peptide.sequence) + anchor_2_pep - len(peptide.sequence)
-		sequence_in_question, template_sequence = anchor_alignment(peptide.sequence, reference.peptide.sequence, 
-															       anchor_1_diff, anchor_2_diff)
+		# 2a. First get the aligned the sequences in terms of anchors
+		(sequence_in_question, template_sequence) = (peptide.tilted_sequence, reference.peptide.tilted_sequence)
+
+		print(sequence_in_question)
+		print(template_sequence)
 
 		# 2b. Calculate the mutation list
 		aa_list_ref = list(template_sequence)
@@ -188,7 +188,6 @@ class pMHC(object):
 		anchor_1 = peptide.primary_anchors[0]
 		if anchor_1 == 1: anchor_1 = 2
 		anchor_2 = peptide.primary_anchors[1]
-		if anchor_2 == len(peptide.sequence) - 1: anchor_2 = len(peptide.sequence)
 
 		# Only peptide
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
@@ -218,8 +217,7 @@ class pMHC(object):
 
 		# Similarly, the canonical case in C-termini is P-Omega. However, in that case, we need an extra AA because the
 		# Configuration is End-2 End-1. So in the canonical case, P-Omega -2 is the endpoint. 
-		other_end = peptide.primary_anchors[1] - 1
-		if peptide.primary_anchors[1] == len(peptide.sequence): other_end = other_end - 1
+		other_end = peptide.primary_anchors[1] - 2
 		with open("./loops.txt", 'w') as loops:
 			loops.write("anchored_pMHC_proper.pdb " + str(one_end) + " " + str(other_end) + " C " + peptide.sequence[(one_end - 1):(other_end)])
 		loops.close()

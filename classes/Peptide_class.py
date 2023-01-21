@@ -6,6 +6,7 @@ from math import copysign
 from biopandas.pdb import PandasPdb
 
 from Bio import Align
+from Bio import pairwise2
 
 import sys
 import os
@@ -19,7 +20,8 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
 											verbose, extract_anchors, count_number_of_atoms,       \
-											score_sequences, predict_anchors_PMBEC, anchor_alignment
+											score_sequences, predict_anchors_PMBEC,                \
+											anchor_alignment, calculate_anchors_given_alignment    \
 
 from classes.pMHC_class import pMHC
 
@@ -31,13 +33,14 @@ from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
 
 class Peptide(object):
 
-	def __init__(self, sequence, PTM_list=[], pdb_filename="", primary_anchors=None, secondary_anchors=None, index=-1):
+	def __init__(self, sequence, PTM_list=[], pdb_filename="", primary_anchors=None, secondary_anchors=None, tilted_sequence=None, index=-1):
 		self.sequence = sequence # make sequence only the AAs
 		self.PTM_list = PTM_list # have PTM list keep track of PTMs
 		self.pdb_filename = pdb_filename
 		self.pdbqt_filename = None
 		self.primary_anchors = primary_anchors
 		self.secondary_anchors = secondary_anchors
+		self.tilted_sequence = tilted_sequence
 		self.index = index
 
 	@classmethod
@@ -55,7 +58,7 @@ class Peptide(object):
 			return cls(sequence=peptide_sequence_noPTM, PTM_list=peptide_PTM_list)
 	
 	@classmethod
-	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, peptide_index=-1):
+	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, tilted_sequence=None, peptide_index=-1):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -70,14 +73,14 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, index=peptide_index)
+		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, tilted_sequence=tilted_sequence, index=peptide_index)
 
 	def get_peptide_template(self, receptor_allotype, anchors, anchor_selection, cv=''):
 
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Proper_files/Template_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -102,8 +105,8 @@ class Peptide(object):
 		templates['anchor_diff'] = abs(templates['anchor_diff'].str[0].astype(int) - templates['anchor_diff'].str[1].astype(int))
 		if anchor_status == "Known":
 			templates = templates[templates['anchor_diff'] == diff]
-		else:
-			templates = templates[templates['peptide_length'] == sequence_length]
+		##else:
+		##	templates = templates[templates['peptide_length'] == sequence_length]
 
 		# 2) Bring the peptide template of MHC closer to the query one given the peptide binding motifs + peptide similarity
 		# This helps mitigating the effect of overfitting to a peptide sequence or an allele
@@ -111,7 +114,7 @@ class Peptide(object):
 		# 2a. Allele similarity:
 		sub_alleles = pd.unique(templates['MHC']).tolist()
 		sub_alleles.append("Allele")
-		similarity_matrix = pd.read_csv("./helper_files/" + str(sequence_length) + "mer_similarity.csv")[sub_alleles]
+		similarity_matrix = pd.read_csv("./helper_files/" + str(max(8, sequence_length)) + "mer_similarity.csv")[sub_alleles]
 		similarity_matrix = similarity_matrix[similarity_matrix["Allele"] == receptor_allotype].drop("Allele", axis=1).T.reset_index(drop=False)
 		similarity_matrix.columns = ['MHC', 'MHC_similarity']
 		templates = templates.merge(similarity_matrix, how='inner', on='MHC')
@@ -122,15 +125,12 @@ class Peptide(object):
 		if anchor_status == "Known":
 			templates['Anchor_diff_1'] = templates['Major_anchor_1'] - int_anchors[0]
 			templates['Anchor_diff_2'] = templates['Major_anchor_2'] - templates['peptide_length'] + int_anchors[1] - sequence_length
-		else:
-			templates['Anchor_diff_1'] = 0
-			templates['Anchor_diff_2'] = 0
 
 		# 2b. Peptide similarity between anchors:
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
+		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 		if anchor_status == "Known":
-			blosum_62 = Align.substitution_matrices.load("BLOSUM62")
 			Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
 			Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
 			for i, template_sequence in enumerate(template_sequences):
@@ -141,13 +141,32 @@ class Peptide(object):
 			self_score = score_sequences(self.sequence, self.sequence, 
 									 matrix=blosum_62, gap_penalty=0)
 		else:
-			aligner = Align.PairwiseAligner()
-			aligner.open_gap_score = -2
-			aligner.extend_gap_score = -0.1
-			aligner.substitution_matrix = Align.substitution_matrices.load("BLOSUM62")
-			for template_sequence in template_sequences:
-				score_list.append(aligner.score(self.sequence, template_sequence))
-			self_score = aligner.score(self.sequence, self.sequence)
+			anchor_1_list = templates['Major_anchor_1'].tolist()
+			anchor_2_list = templates['Major_anchor_2'].tolist()
+			anchor_1_diff_list = []
+			tilted_sequences_list = []
+			tilted_template_sequences_list = []
+			for i, template_sequence in enumerate(template_sequences):
+				alignments = pairwise2.align.localds(self.sequence, template_sequence, blosum_62, -1000, -0.5)
+				try:
+					temp_sequence_in_question = alignments[0].seqA
+					temp_template_sequence = alignments[0].seqB
+					score_list.append(alignments[0].score)
+					(temp_anchor_1, temp_anchor_2) = calculate_anchors_given_alignment(temp_sequence_in_question, temp_template_sequence, anchor_1_list[i], anchor_2_list[i])
+				except IndexError:
+					temp_sequence_in_question = ''
+					temp_template_sequence = ''
+					score_list.append(-1000)
+					(temp_anchor_1, temp_anchor_2) = (2, 9)
+				anchor_1_diff_list.append(anchor_1_list[i] - temp_anchor_1)
+				tilted_sequences_list.append(temp_sequence_in_question)
+				tilted_template_sequences_list.append(temp_template_sequence)
+			templates['Anchor_diff_1'] = anchor_1_diff_list
+			templates['Anchor_diff_2'] = [0] * len(anchor_1_diff_list)
+			templates['Tilted_sequence'] = tilted_sequences_list
+			templates['Tilted_template_sequence'] = tilted_template_sequences_list
+			alignments = pairwise2.align.localds(self.sequence, self.sequence, blosum_62, -1000, -0.5)
+			self_score = alignments[0].score
 
 		score_list_norm = [score / self_score for score in score_list]
 		templates['Peptide_similarity'] = score_list_norm
@@ -165,10 +184,17 @@ class Peptide(object):
 
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
-		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
+		peptide_template_file = './new_templates_final/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
-		# 3) Extract the anchor position numbers for the anchor tolerance step!
+		# 3) Calculate anchor alignment, give the anchor differences that were found previously
+		if anchor_status == "Known":
+			tilted_sequence, template_tilted_sequence = anchor_alignment(self.sequence, final_selection['peptide'].values[0], 
+															         	 final_selection['Anchor_diff_1'].values[0], final_selection['Anchor_diff_2'].values[0])
+		else:
+			tilted_sequence, template_tilted_sequence = final_selection['Tilted_sequence'].values[0], final_selection['Tilted_template_sequence'].values[0]
+
+		# 4) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
 		template_major_anchors = [int(anchor) for anchor in final_selection['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
 		template_secondary_anchors = [int(anchor) for anchor in final_selection['Secondary_anchors'].apply(lambda x: x.split(",")).values[0]]
@@ -177,18 +203,19 @@ class Peptide(object):
 		else:
 			peptide_primary_anchors = template_major_anchors
 
-		# 4) Secondary anchors adjustment!
+		# 5) Secondary anchors adjustment!
 		# Filtering secondary anchors that won't make sense give the left/right tilt
 		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
 		peptide_second_anchors = [anchor - Anchor_diff_1 for anchor in template_secondary_anchors]
 		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
 		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if anchor - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
 
-		# 5) Define the peptide template object
+		# 6) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
 														  primary_anchors=template_major_anchors,
-														  secondary_anchors=template_secondary_anchors))
+														  secondary_anchors=template_secondary_anchors,
+														  tilted_sequence=template_tilted_sequence))
 
 		if verbose(): 
 			print("Done with choosing a peptide template!")
@@ -200,6 +227,7 @@ class Peptide(object):
 		self.pdb_filename = None
 		self.primary_anchors = peptide_primary_anchors 
 		self.secondary_anchors = peptide_second_anchors
+		self.tilted_sequence = tilted_sequence
 
 		return peptide_template
 
@@ -307,6 +335,7 @@ class Peptide(object):
 
 		# Only anchors
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(self.secondary_anchors)]
+
 		# Only carbon-alpha atoms
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['atom_name'] == 'CA']
 
