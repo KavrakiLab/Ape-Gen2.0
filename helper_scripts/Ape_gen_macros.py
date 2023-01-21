@@ -300,6 +300,16 @@ def anchor_alignment(seq1, seq2, anchor_diff1, anchor_diff2):
 		temp_seq2 = temp_seq2 + extra_in_end
 	return temp_seq1, temp_seq2
 
+def calculate_anchors_given_alignment(seq, seq_template, anchor_1, anchor_2):
+
+	extra_in_beginning = len(seq)-len(seq.lstrip('-'))
+	extra_in_beginning_template = len(seq_template)-len(seq_template.lstrip('-'))
+	extra_in_end = len(seq)-len(seq.rstrip('-'))
+	extra_in_end_template = len(seq_template)-len(seq_template.rstrip('-'))
+	anchor_1 = anchor_1 - extra_in_beginning + extra_in_beginning_template
+	anchor_2 = anchor_2 - extra_in_beginning + extra_in_beginning_template - extra_in_end + extra_in_end_template 
+	return (anchor_1, anchor_2)
+
 ## RESIDUE RENAMING AFTER SMINA FLEXIBILITY OUTPUT
 
 def csp_solver(edge_list, residue, atom_indexes, CA_loc, C_loc):
@@ -523,7 +533,8 @@ def extract_anchors_PMBEC(peptide, MHC, frequencies):
 		if min_will_c > will_pos_c:
 			min_will_c = will_pos_c
 			arg_will_c = pos
-	
+	print(stability_c)
+	print(min_will_c)
 	anchor_1 = "2"
 	if (will_11 < -0.3) and (will_12 < 0.05) and (will_13 < -0.06):
 		anchor_1 = "1"
@@ -551,7 +562,7 @@ def predict_anchors(peptide, MHC):
 	return anchors, anchor_status
 
 def predict_anchors_PMBEC(peptide, MHC):
-	
+
 	frequencies = pd.read_csv("./helper_files/mhcflurry.ba.frequency_matrices.csv")
 	frequencies = frequencies[(frequencies['cutoff_fraction'] == 0.01)]
 	frequencies['X'] = np.zeros(frequencies.shape[0])
