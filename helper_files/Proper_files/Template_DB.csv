@@ -166,7 +166,6 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 4U6Y.pdb,HLA-A*02:01,FLNKDLEVDGHFVTM,15,"2,15","15,2,6"
 6GB5.pdb,H2-Db,FAPGNYP,7,"2,5","1,5,2,3,7"
 3VJ6.pdb,H2-T23,AMAPRTLLL,9,"2,7","1,2,6,7,9"
-6VQY.pdb,HLA-B*27:05,KRWIILG,7,"2,7","2,7"
 5GSD.pdb,HLA-A*11:01,SSCPLSK,7,"2,7","1,2,7"
 3TIE.pdb,H2-Kb,AIVNYANL,8,"2,8","1,5,2,8"
 1S7S.pdb,H2-Kb,ALYNFATM,8,"2,8","1,5,2,3,8"
