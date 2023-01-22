@@ -278,12 +278,15 @@ def pretty_print_analytics(csv_location, verbose=True):
 		print(results_csv.to_markdown(index=False))
 	return results_csv
 
-def score_sequences(seq1, seq2, matrix, gap_penalty):
+def score_sequences(seq1, seq2, matrix, gap_penalty, norm):
 	score = 0
+	num_gaps = 0
 	for A,B in zip(seq1,seq2):
 		diag = ('-'==A) or ('-'==B)
-		score += gap_penalty if diag else matrix[A,B]
-	return score
+		score += 0 if diag else matrix[A,B]
+		num_gaps += 1 if diag else 0
+	score = score/norm
+	return score + num_gaps*gap_penalty
 
 def anchor_alignment(seq1, seq2, anchor_diff1, anchor_diff2):
 	extra_in_beginning = ''.join('-'*abs(anchor_diff1))

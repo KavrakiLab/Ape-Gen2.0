@@ -21,7 +21,7 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											standard_three_to_one_letter_code, anchor_dictionary,  \
 											verbose, extract_anchors, count_number_of_atoms,       \
 											score_sequences, predict_anchors_PMBEC,                \
-											anchor_alignment, calculate_anchors_given_alignment    \
+											anchor_alignment, calculate_anchors_given_alignment 
 
 from classes.pMHC_class import pMHC
 
@@ -33,7 +33,8 @@ from openmm.app import PDBFile, ForceField, Modeller, CutoffNonPeriodic
 
 class Peptide(object):
 
-	def __init__(self, sequence, PTM_list=[], pdb_filename="", primary_anchors=None, secondary_anchors=None, tilted_sequence=None, index=-1):
+	def __init__(self, sequence, PTM_list=[], pdb_filename="", primary_anchors=None, secondary_anchors=None, 
+				 tilted_sequence=None, index=-1):
 		self.sequence = sequence # make sequence only the AAs
 		self.PTM_list = PTM_list # have PTM list keep track of PTMs
 		self.pdb_filename = pdb_filename
@@ -58,7 +59,8 @@ class Peptide(object):
 			return cls(sequence=peptide_sequence_noPTM, PTM_list=peptide_PTM_list)
 	
 	@classmethod
-	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, tilted_sequence=None, peptide_index=-1):
+	def frompdb(cls, pdb_filename, PTM_list=[], primary_anchors=None, secondary_anchors=None, 
+		        tilted_sequence=None, peptide_index=-1):
 		# Initialize peptide from a .pdb file
 		ppdb = PandasPdb()
 		ppdb.read_pdb(pdb_filename)
@@ -73,14 +75,16 @@ class Peptide(object):
 			peptide_sequence = ''.join([all_three_to_one_letter_codes[aa] for aa in peptide_3letter_list])
 		except KeyError as e:
 			if verbose(): print("There is something wrong with your .pdb 3-letter amino acid notation")
-		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, tilted_sequence=tilted_sequence, index=peptide_index)
+		return cls(pdb_filename=pdb_filename, sequence=peptide_sequence, PTM_list=PTM_list, 
+			       primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, 
+			       tilted_sequence=tilted_sequence, index=peptide_index)
 
 	def get_peptide_template(self, receptor_allotype, anchors, anchor_selection, cv=''):
 
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Proper_files/Template_DB.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -132,6 +136,8 @@ class Peptide(object):
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
 		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
+		self_score = score_sequences(self.sequence, self.sequence, matrix=blosum_62, gap_penalty=0, norm=1)
+		print("Self_score= ", self_score)
 		if anchor_status == "Known":
 			Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
 			Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
@@ -139,9 +145,7 @@ class Peptide(object):
 				temp_sequence_in_question, temp_template_sequence = anchor_alignment(self.sequence, template_sequence, 
 																				 Anchor_diff_1[i], Anchor_diff_2[i])
 				score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
-											  matrix=blosum_62, gap_penalty=0))
-			self_score = score_sequences(self.sequence, self.sequence, 
-									 matrix=blosum_62, gap_penalty=0)
+											      matrix=blosum_62, gap_penalty=0, norm=self_score))
 		else:
 			anchor_1_list = templates['Major_anchor_1'].tolist()
 			anchor_2_list = templates['Major_anchor_2'].tolist()
@@ -150,16 +154,28 @@ class Peptide(object):
 			tilted_template_sequences_list = []
 			for i, template_sequence in enumerate(template_sequences):
 				alignments = pairwise2.align.localds(self.sequence, template_sequence, blosum_62, -1000, -5)
-				try:
-					temp_sequence_in_question = alignments[0].seqA
-					temp_template_sequence = alignments[0].seqB
-					score_list.append(alignments[0].score - (temp_sequence_in_question + temp_template_sequence).count('-')*2)
-					(temp_anchor_1, temp_anchor_2) = calculate_anchors_given_alignment(temp_sequence_in_question, temp_template_sequence, anchor_1_list[i], anchor_2_list[i])
-				except IndexError:
+				if len(alignments) == 0:
 					temp_sequence_in_question = ''
 					temp_template_sequence = ''
 					score_list.append(-1000)
 					(temp_anchor_1, temp_anchor_2) = (2, 9)
+				else: # When multiple results, return multiple alignment scores.
+					max_score = -float("inf")
+					best_sequence = ''
+					best_template_sequence = ''
+					for alignment in alignments:
+						temp_sequence_in_question = alignment.seqA
+						temp_template_sequence = alignment.seqB
+						temp_score = score_sequences(temp_sequence_in_question, temp_template_sequence, 
+											         matrix=blosum_62, gap_penalty=-0.1, norm=self_score)
+						if max_score < temp_score:
+							max_score = temp_score
+							best_sequence = temp_sequence_in_question
+							best_template_sequence = temp_template_sequence
+					temp_sequence_in_question = best_sequence
+					temp_template_sequence = best_template_sequence
+					score_list.append(max_score)
+					(temp_anchor_1, temp_anchor_2) = calculate_anchors_given_alignment(temp_sequence_in_question, temp_template_sequence, anchor_1_list[i], anchor_2_list[i])
 				anchor_1_diff_list.append(anchor_1_list[i] - temp_anchor_1)
 				tilted_sequences_list.append(temp_sequence_in_question)
 				tilted_template_sequences_list.append(temp_template_sequence)
@@ -168,10 +184,8 @@ class Peptide(object):
 			templates['Tilted_sequence'] = tilted_sequences_list
 			templates['Tilted_template_sequence'] = tilted_template_sequences_list
 			alignments = pairwise2.align.localds(self.sequence, self.sequence, blosum_62, -1000, -5)
-			self_score = alignments[0].score
 
-		score_list_norm = [score / self_score for score in score_list]
-		templates['Peptide_similarity'] = score_list_norm
+		templates['Peptide_similarity'] = score_list
 
 		# 2c. Try filtering by organism first; if that does not bring options, try all!	
 		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty and anchor_status == "Known":
@@ -182,17 +196,18 @@ class Peptide(object):
 		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
 
 		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score']].sort_values(by=['Similarity_score'], ascending=False).head(20))
-		#input()
 
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
-		peptide_template_file = './new_templates_final/' + final_selection['pdb_code'].values[0]
+		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
 		# 3) Calculate anchor alignment, give the anchor differences that were found previously
 		if anchor_status == "Known":
-			tilted_sequence, template_tilted_sequence = anchor_alignment(self.sequence, final_selection['peptide'].values[0], 
-															         	 final_selection['Anchor_diff_1'].values[0], final_selection['Anchor_diff_2'].values[0])
+			tilted_sequence, template_tilted_sequence = anchor_alignment(self.sequence, 
+																		 final_selection['peptide'].values[0], 
+															         	 final_selection['Anchor_diff_1'].values[0], 
+															         	 final_selection['Anchor_diff_2'].values[0])
 		else:
 			tilted_sequence, template_tilted_sequence = final_selection['Tilted_sequence'].values[0], final_selection['Tilted_template_sequence'].values[0]
 
@@ -205,9 +220,11 @@ class Peptide(object):
 		else:
 			peptide_primary_anchors = template_major_anchors
 			peptide_primary_anchors[1] = template_major_anchors[1] - (len(tilted_sequence) - len(tilted_sequence.rstrip('-'))) # This to adjust the C-terminus anchor when the template is larger in size
+			peptide_primary_anchors = [anchor - final_selection['Anchor_diff_1'].values[0] for anchor in template_major_anchors] # Anchor adjustement step (see below)
 
-		# 5) Secondary anchors adjustment!
-		# Filtering secondary anchors that won't make sense give the left/right tilt
+
+		# 5) Anchors adjustment!
+		# Filtering Anchors that won't make sense give the left/right tilt
 		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
 		peptide_second_anchors = [anchor - Anchor_diff_1 for anchor in template_secondary_anchors]
 		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
@@ -216,9 +233,9 @@ class Peptide(object):
 		# 6) Define the peptide template object
 		peptide_template = pMHC(pdb_filename=peptide_template_file, 
 								peptide=Peptide.frompdb(pdb_filename=peptide_template_file, 
-														  primary_anchors=template_major_anchors,
-														  secondary_anchors=template_secondary_anchors,
-														  tilted_sequence=template_tilted_sequence))
+														primary_anchors=template_major_anchors,
+														secondary_anchors=template_secondary_anchors,
+														tilted_sequence=template_tilted_sequence))
 
 		if verbose(): 
 			print("Done with choosing a peptide template!")
@@ -301,25 +318,25 @@ class Peptide(object):
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 12 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 12 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 12 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 12 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 
