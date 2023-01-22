@@ -99,7 +99,7 @@ def model_receptor(allele_sequence, peptide_sequence, allotype, filestore, cv):
 	if verbose(): print("Searching for the closest match in terms of sequence:")
 	best_record_list = []
 	best_score = 0 
-	for seq_record in SeqIO.parse("./helper_files/template_sequences.fasta", "fasta"):
+	for seq_record in SeqIO.parse("./helper_files/Pandora_files/template_sequences.fasta", "fasta"):
 
 		# Do a quick alignment
 		
@@ -114,7 +114,7 @@ def model_receptor(allele_sequence, peptide_sequence, allotype, filestore, cv):
 
 	# This is repeated code btw, see if you can make a function for this, it would be amazing
 	if verbose(): print("Fetching now the most appropriate template that will host the peptide in question:")
-	templates = pd.read_csv("./helper_files/Pandora_DB.csv")
+	templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv")
 	if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
 	# Peptide Similarity
@@ -142,7 +142,7 @@ def model_receptor(allele_sequence, peptide_sequence, allotype, filestore, cv):
 	# Solution: Do a global alignment, where you penalize opening gaps, as such, the gap in the beginning is
 	# that weird starting aa seq, and ther gap in the end will be the B-chain.
 	# THINK ABOUT WHEN THIS FAILS!
-	for seq_record in SeqIO.parse("./helper_files/a_chain_sequences.fasta", "fasta"):
+	for seq_record in SeqIO.parse("./helper_files/Pandora_files/a_chain_sequences.fasta", "fasta"):
 		if seq_record.id == pdb_filename:
 			a_chain_alignment = pairwise2.align.globalxs(allele_sequence, str(seq_record.seq), open=-.5, extend=0)
 	original_sequence = list(str(a_chain_alignment[0][0]))
@@ -216,7 +216,7 @@ class Receptor(object):
 	def fromallotype(cls, allotype, peptide_sequence, filestore, cv=''):
 
 		# Check #1: Existing structures
-		templates = pd.read_csv("./helper_files/Pandora_DB.csv")
+		templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv")
 
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
 
