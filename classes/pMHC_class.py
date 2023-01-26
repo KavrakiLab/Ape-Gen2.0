@@ -79,17 +79,26 @@ class pMHC(object):
 		pdb_df_peptide = pdb_df_peptide[pdb_df_peptide['chain_id'] == 'C']
 
 		# 1c. Calculate anchor differences between reference and peptide in question
-		anchor_1_ref = reference.peptide.primary_anchors[0]
-		anchor_2_ref = reference.peptide.primary_anchors[1]
-		anchor_1_pep = peptide.primary_anchors[0]
-		anchor_2_pep = peptide.primary_anchors[1]
-		anchor_1_diff = anchor_1_ref - anchor_1_pep
-		anchor_2_diff = anchor_2_ref - anchor_2_pep
+		(sequence_in_question, template_sequence) = (peptide.tilted_sequence, reference.peptide.tilted_sequence)
+
+		print(sequence_in_question)
+		print(template_sequence)
+
+		indexes_for_deletion = [pos + 1 for pos, char in enumerate(sequence_in_question) if char == '-']
+		
+		#anchor_1_ref = reference.peptide.primary_anchors[0]
+		#anchor_2_ref = reference.peptide.primary_anchors[1]
+		#anchor_1_pep = peptide.primary_anchors[0]
+		#anchor_2_pep = peptide.primary_anchors[1]
+		#anchor_1_diff = anchor_1_ref - anchor_1_pep
+		#anchor_2_diff = anchor_2_ref - anchor_2_pep
 
 		# 1d. Delete if there is a tilt
-		pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
-									    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
-		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
+		#pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
+		#							    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
+		#pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
+		pdb_df_peptide = pdb_df_peptide[~pdb_df_peptide['residue_number'].isin(indexes_for_deletion)]
+		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - (len(sequence_in_question) - len(sequence_in_question.lstrip('-')))
 
 		# 1e. Store
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
@@ -102,13 +111,7 @@ class pMHC(object):
 
 		# 2. Mutate
 
-		# 2a. First get the aligned the sequences in terms of anchors
-		(sequence_in_question, template_sequence) = (peptide.tilted_sequence, reference.peptide.tilted_sequence)
-
-		print(sequence_in_question)
-		print(template_sequence)
-
-		# 2b. Calculate the mutation list
+		# 2a. Calculate the mutation list
 		aa_list_ref = list(template_sequence)
 		aa_list_in_question = list(sequence_in_question)
 		mutation_list = []
@@ -125,7 +128,7 @@ class pMHC(object):
 			i += 1
 			j += 1
 
-		# 2c. Apply mutations using the mutation list
+		# 2b. Apply mutations using the mutation list
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
 
 		print('\tNecessary residue Mutations completed!')
