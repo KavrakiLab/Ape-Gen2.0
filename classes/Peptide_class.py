@@ -93,13 +93,9 @@ class Peptide(object):
 		# 1) Feature filtering to predict which are the anchors (when they are not given)
 		if anchors == "":	
 			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-			if len(self.sequence) <= 7:
-				(anchors, anchor_status) = ("2,7", "Not Known")
-				print("Peptide sequence is very small to use SMM matrices!") 
-			else:
-				anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
+			anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
 			if verbose():
-				if anchor_status == "Not Known" or len(self.sequence) <= 7:
+				if anchor_status == "Not Known":
 					print("SMM matrices could NOT be used... Defaulting to peptide sequence alignment")
 				else:
 					print("Receptor allotype has a SMM matrix!")
@@ -183,7 +179,6 @@ class Peptide(object):
 			templates['Anchor_diff_2'] = [0] * len(anchor_1_diff_list)
 			templates['Tilted_sequence'] = tilted_sequences_list
 			templates['Tilted_template_sequence'] = tilted_template_sequences_list
-			alignments = pairwise2.align.localds(self.sequence, self.sequence, blosum_62, -1000, -5)
 
 		templates['Peptide_similarity'] = score_list
 
@@ -195,7 +190,7 @@ class Peptide(object):
 		# If there are duplicate results, select at one at random!
 		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
 
-		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score']].sort_values(by=['Similarity_score'], ascending=False).head(20))
+		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score', 'Anchor_diff_1']].sort_values(by=['Similarity_score'], ascending=False).head(20))
 
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
@@ -220,8 +215,7 @@ class Peptide(object):
 		else:
 			peptide_primary_anchors = template_major_anchors
 			peptide_primary_anchors[1] = template_major_anchors[1] - (len(tilted_sequence) - len(tilted_sequence.rstrip('-'))) # This to adjust the C-terminus anchor when the template is larger in size
-			peptide_primary_anchors = [anchor - final_selection['Anchor_diff_1'].values[0] for anchor in template_major_anchors] # Anchor adjustement step (see below)
-
+			peptide_primary_anchors = [max(1, anchor - final_selection['Anchor_diff_1'].values[0]) for anchor in template_major_anchors] # Anchor adjustement step (see below)
 
 		# 5) Anchors adjustment!
 		# Filtering Anchors that won't make sense give the left/right tilt

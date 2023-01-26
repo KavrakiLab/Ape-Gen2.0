@@ -573,10 +573,10 @@ def predict_anchors_PMBEC(peptide, MHC):
 	frequencies_alleles = os.listdir('./helper_files/PMBEC/') 
 	frequencies_alleles = [x.split('.')[0] for x in frequencies_alleles]
 	
-	if MHC in frequencies_alleles:
-		anchors = extract_anchors_PMBEC(peptide, MHC, frequencies)
-		anchor_status = "Known"
-	else:
+	if (len(peptide) <= 7) or MHC not in frequencies_alleles:
 		anchors = "2," + str(len(peptide))
 		anchor_status = "Not Known"
+	else:
+		anchors = extract_anchors_PMBEC(peptide, MHC, frequencies)
+		anchor_status = "Known"
 	return anchors, anchor_status
