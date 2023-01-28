@@ -131,20 +131,20 @@ class Peptide(object):
 		# 2b. Peptide similarity between anchors:
 		score_list = []
 		template_sequences = templates['peptide'].tolist()
+		anchor_1_list = templates['Major_anchor_1'].tolist()
+		anchor_2_list = templates['Major_anchor_2'].tolist()
 		blosum_62 = Align.substitution_matrices.load("BLOSUM62")
-		self_score = score_sequences(self.sequence, self.sequence, matrix=blosum_62, gap_penalty=0, norm=1)
-		print("Self_score= ", self_score)
+		self_score = score_sequences(self.sequence, self.sequence, 0, 0, matrix=blosum_62, gap_penalty=0, norm=1) # Self score that does not care about anchor placements.
 		if anchor_status == "Known":
 			Anchor_diff_1 = templates['Anchor_diff_1'].tolist()
 			Anchor_diff_2 = templates['Anchor_diff_2'].tolist()
 			for i, template_sequence in enumerate(template_sequences):
 				temp_sequence_in_question, temp_template_sequence = anchor_alignment(self.sequence, template_sequence, 
 																				 Anchor_diff_1[i], Anchor_diff_2[i])
-				score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence, 
+				score_list.append(score_sequences(temp_sequence_in_question, temp_template_sequence,
+												  anchor_1_list[i], anchor_2_list[i],  
 											      matrix=blosum_62, gap_penalty=0, norm=self_score))
 		else:
-			anchor_1_list = templates['Major_anchor_1'].tolist()
-			anchor_2_list = templates['Major_anchor_2'].tolist()
 			anchor_1_diff_list = []
 			tilted_sequences_list = []
 			tilted_template_sequences_list = []
@@ -162,8 +162,9 @@ class Peptide(object):
 					for alignment in alignments:
 						temp_sequence_in_question = alignment.seqA
 						temp_template_sequence = alignment.seqB
-						temp_score = score_sequences(temp_sequence_in_question, temp_template_sequence, 
-											         matrix=blosum_62, gap_penalty=-0.1, norm=self_score)
+						temp_score = score_sequences(temp_sequence_in_question, temp_template_sequence,
+													 anchor_1_list[i], anchor_2_list[i], 
+											         matrix=blosum_62, gap_penalty=-0.2, norm=self_score)
 						if max_score < temp_score:
 							max_score = temp_score
 							best_sequence = temp_sequence_in_question

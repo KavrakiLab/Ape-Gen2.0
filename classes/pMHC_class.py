@@ -98,7 +98,7 @@ class pMHC(object):
 		#							    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
 		#pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
 		pdb_df_peptide = pdb_df_peptide[~pdb_df_peptide['residue_number'].isin(indexes_for_deletion)]
-		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - (len(sequence_in_question) - len(sequence_in_question.lstrip('-')))
+		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - (len(sequence_in_question) - len(sequence_in_question.lstrip('-'))) + (len(template_sequence) - len(template_sequence.lstrip('-')))
 
 		# 1e. Store
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
@@ -127,6 +127,7 @@ class pMHC(object):
 				pass
 			i += 1
 			j += 1
+		print(mutation_list)
 
 		# 2b. Apply mutations using the mutation list
 		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
