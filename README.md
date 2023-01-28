@@ -62,6 +62,8 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- See if there is a cleaner way to define the anchors for cases not found in PMBEC.
+- Add MHCFlurry motifs prediction in the workflow (you can take those from the notebooks created)
 - Add pdb2pqr for protonation.
 - Taxonomy on what is a macro and what is a class method must be done at some point
 - Send an e-mail to Chacon lab for the RCD file that does not want to work
@@ -86,8 +88,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Thorough input checking (example is peptide sequence in HLA peptide fetching must be an amino acid sequence)
 
 #### Major issues:
-- Remove `addH` variable
-- Find another way for the case where we cannot find an appropriate template: Fetch a template with same sequence length if it exists and just replace. If there is not, add it: 2 cases, a 15-mer and a 14-mer in the DB, codes to add: 6VQ2, 4U6X
 - Testing/Testing/Testing...
 
 ### PTMs:
