@@ -14,6 +14,7 @@ from Bio.Align import substitution_matrices
 from constraint import *
 
 from nltk import ngrams
+from itertools import zip_longest
 
 # PDBFIXER
 from pdbfixer import PDBFixer
@@ -305,6 +306,8 @@ def score_sequences(seq1, seq2, anchor_1, anchor_2, matrix, gap_penalty, norm):
 	return score + num_gaps*gap_penalty
 
 def anchor_alignment(seq1, seq2, anchor_diff1, anchor_diff2):
+	
+	# Actual alignment part
 	extra_in_beginning = ''.join('-'*abs(anchor_diff1))
 	extra_in_end = ''.join('-'*abs(anchor_diff2))
 	if anchor_diff1 > 0:
@@ -317,6 +320,17 @@ def anchor_alignment(seq1, seq2, anchor_diff1, anchor_diff2):
 		temp_seq1 = temp_seq1 + extra_in_end
 	else:
 		temp_seq2 = temp_seq2 + extra_in_end
+
+	# Add to anything:
+	diff = len(temp_seq1) - len(temp_seq2)
+	if diff >= 0:
+		temp_seq2 = temp_seq2 + ''.join('-'*diff)
+	else:
+		temp_seq1 = temp_seq1 + ''.join('-'*abs(diff))
+
+	# Remove redundancies
+	[temp_seq1, temp_seq2] = [''.join(k) for k in zip(*[i for i in zip_longest(temp_seq1, temp_seq2, fillvalue = "") if (i[0] != '-' or i[1] != '-')])]
+
 	return temp_seq1, temp_seq2
 
 def calculate_anchors_given_alignment(seq, seq_template, anchor_1, anchor_2):

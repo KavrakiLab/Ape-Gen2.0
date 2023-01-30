@@ -84,7 +84,7 @@ class pMHC(object):
 		print(sequence_in_question)
 		print(template_sequence)
 
-		indexes_for_deletion = [pos + 1 for pos, char in enumerate(sequence_in_question) if char == '-']
+		indexes_for_deletion = [min(pos + 1, len(reference.peptide.sequence)) for pos, char in enumerate(sequence_in_question) if char == '-']
 		
 		#anchor_1_ref = reference.peptide.primary_anchors[0]
 		#anchor_2_ref = reference.peptide.primary_anchors[1]
