@@ -19,9 +19,9 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,  
 											replace_chains, remove_remarks_and_others_from_pdb,    \
 											delete_elements, extract_CONECT_from_pdb, csp_solver,  \
 											standard_three_to_one_letter_code, anchor_dictionary,  \
-											verbose, extract_anchors, count_number_of_atoms,       \
-											score_sequences, predict_anchors_PMBEC,                \
-											anchor_alignment, calculate_anchors_given_alignment 
+											verbose, count_number_of_atoms, score_sequences,       \
+											predict_anchors_PMBEC, anchor_alignment,               \
+											calculate_anchors_given_alignment 
 
 from classes.pMHC_class import pMHC
 
