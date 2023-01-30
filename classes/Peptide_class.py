@@ -164,7 +164,7 @@ class Peptide(object):
 						temp_template_sequence = alignment.seqB
 						temp_score = score_sequences(temp_sequence_in_question, temp_template_sequence,
 													 anchor_1_list[i], anchor_2_list[i], 
-											         matrix=blosum_62, gap_penalty=-0.2, norm=self_score)
+											         matrix=blosum_62, gap_penalty=-0.25, norm=self_score)
 						if max_score < temp_score:
 							max_score = temp_score
 							best_sequence = temp_sequence_in_question
