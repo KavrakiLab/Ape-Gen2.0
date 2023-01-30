@@ -84,19 +84,9 @@ class pMHC(object):
 		print(sequence_in_question)
 		print(template_sequence)
 
-		indexes_for_deletion = [min(pos + 1, len(reference.peptide.sequence)) for pos, char in enumerate(sequence_in_question) if char == '-']
+		indexes_for_deletion = [pos + 1 for pos, char in enumerate(sequence_in_question) if char == '-']
+		indexes_for_deletion = [pos - (len(template_sequence) - len(template_sequence.lstrip('-'))) for pos in indexes_for_deletion if pos > 5] # Adjustment for C-terminus indexes when there is a tilt from the front (example: 2FWO).
 		
-		#anchor_1_ref = reference.peptide.primary_anchors[0]
-		#anchor_2_ref = reference.peptide.primary_anchors[1]
-		#anchor_1_pep = peptide.primary_anchors[0]
-		#anchor_2_pep = peptide.primary_anchors[1]
-		#anchor_1_diff = anchor_1_ref - anchor_1_pep
-		#anchor_2_diff = anchor_2_ref - anchor_2_pep
-
-		# 1d. Delete if there is a tilt
-		#pdb_df_peptide = pdb_df_peptide[(pdb_df_peptide['residue_number'] > anchor_1_diff) & \
-		#							    (pdb_df_peptide['residue_number'] <= anchor_2_diff + len(peptide.sequence))]
-		#pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - anchor_1_diff
 		pdb_df_peptide = pdb_df_peptide[~pdb_df_peptide['residue_number'].isin(indexes_for_deletion)]
 		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - (len(sequence_in_question) - len(sequence_in_question.lstrip('-'))) + (len(template_sequence) - len(template_sequence.lstrip('-')))
 
