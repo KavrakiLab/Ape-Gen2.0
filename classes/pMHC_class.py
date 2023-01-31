@@ -85,8 +85,8 @@ class pMHC(object):
 		print(template_sequence)
 
 		indexes_for_deletion = [pos + 1 for pos, char in enumerate(sequence_in_question) if char == '-']
-		indexes_for_deletion = [pos - (len(template_sequence) - len(template_sequence.lstrip('-'))) for pos in indexes_for_deletion if pos > 5] # Adjustment for C-terminus indexes when there is a tilt from the front (example: 2FWO).
-		
+		indexes_for_deletion = [pos - (len(template_sequence) - len(template_sequence.lstrip('-'))) if pos > 5 else pos for pos in indexes_for_deletion] # Adjustment for C-terminus indexes when there is a tilt from the front (example: 2FWO).
+
 		pdb_df_peptide = pdb_df_peptide[~pdb_df_peptide['residue_number'].isin(indexes_for_deletion)]
 		pdb_df_peptide['residue_number'] = pdb_df_peptide['residue_number'] - (len(sequence_in_question) - len(sequence_in_question.lstrip('-'))) + (len(template_sequence) - len(template_sequence.lstrip('-')))
 
