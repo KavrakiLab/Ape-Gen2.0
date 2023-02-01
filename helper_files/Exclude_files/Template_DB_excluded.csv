@@ -195,7 +195,7 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 4HUW.pdb,H2-Db,ASNENTETM,9,"2,9","1,5,2,3,9"
 3QQ4.pdb,SLA-1*04:01:01,ATAAATEAY,9,"2,9","1,2,6,9"
 6JOZ.pdb,HLA-A*11:01,ATIGTAMYK,9,"2,9","1,2,9"
-5YMV.pdb,Gaga-BF2*012:01:01,AVKGVGTMV,9,"2,9","1,5,2,8,9"
+5YMV.pdb,Gaga-BF2*012:01:01,AVKGVGTMV,9,"2,8","1,5,2,8,9"
 3MRJ.pdb,HLA-A*02:01,CINGMCWTV,9,"2,9","1,2,9"
 3MRG.pdb,HLA-A*02:01,CINGVCWTV,9,"2,9","1,2,6,9"
 3MRL.pdb,HLA-A*02:01,CINGVVWTV,9,"2,9","1,2,9"
