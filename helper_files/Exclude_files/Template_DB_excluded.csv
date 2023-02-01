@@ -310,7 +310,6 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 3RWC.pdb,Mamu-B*017:01:01:01,IRYPKTFGW,9,"2,9","1,2,9"
 2BVP.pdb,HLA-B*57:03,ISPRTLDAW,9,"2,9","2,9,3"
 1TVB.pdb,HLA-A*02:01,ITDQVPFSV,9,"2,9","2,9"
-1ZHB.pdb,H2-Db,KALYNYAPI,9,"2,9","1,5,2,3,9"
 4NSK.pdb,H2-Db,KAPYNFATM,9,"2,9","1,5,2,3,9"
 1S7X.pdb,H2-Db,KAVFNFATM,9,"2,9","1,5,2,3,9"
 1FG2.pdb,H2-Db,KAVYNFATC,9,"2,9","1,5,2,3,9"
