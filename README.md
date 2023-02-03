@@ -62,6 +62,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Motifs from openvax that are identical in regards to alleles do not exist as is in the file. I need to match e.g. `A*02:17` to `A*02:01` correctly.  
 - See if there is a cleaner way to define the anchors for cases not found in PMBEC.
 - Add MHCFlurry motifs prediction in the workflow (you can take those from the notebooks created)
 - Add pdb2pqr for protonation.
