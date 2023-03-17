@@ -288,11 +288,11 @@ def score_sequences(seq1, seq2, anchor_1, anchor_2, matrix, gap_penalty, norm):
 		return -1000
 	if (seq2[anchor_2_idx] != '-') and (seq1[anchor_2_idx] == '-'): # When C-anchor is not covered
 		return -1000
-	if (anchor_1 >= 3) and ((len(seq1) - len(seq1.lstrip('-'))) > 0): # When N-anchor is found at pos 3, then we cannot add aas before
+	if (anchor_1 >= 3) and ((len(seq2) - len(seq2.lstrip('-'))) > 0): # When N-anchor is found at pos 3, then we cannot add aas before
 		return -1000
-	if (anchor_1 == 2) and ((len(seq1) - len(seq1.lstrip('-'))) > 1): # When N-anchor is found at pos 2, then we cannot add more than 1 aa before it.
+	if (anchor_1 == 2) and ((len(seq2) - len(seq2.lstrip('-'))) > 1): # When N-anchor is found at pos 2, then we cannot add more than 1 aa before it.
 		return -1000
-	if (anchor_1 == 1) and ((len(seq1) - len(seq1.lstrip('-'))) > 2): # When N-anchor is found at pos 1, then we cannot add more than 2 aa before it.
+	if (anchor_1 == 1) and ((len(seq2) - len(seq2.lstrip('-'))) > 2): # When N-anchor is found at pos 1, then we cannot add more than 2 aa before it.
 		return -1000
 
 	# Actual scoring
