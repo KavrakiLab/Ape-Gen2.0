@@ -53,7 +53,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Add the option of constraining/not constraining the backbone during OpenMM optimization
+- Add 7CIQ, 3ROO to DB
 - Add the option to choose a template if the user wants it to
 - Renumber the indexes appearing like `5001`, `5002`, `5003` etc. in the results, maybe have an extra column stating where the result came from
 - Motifs from openvax that are identical in regards to alleles do not exist as is in the file. I need to match e.g. `A*02:17` to `A*02:01` correctly.
