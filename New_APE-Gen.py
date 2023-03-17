@@ -30,9 +30,6 @@ def prepare_for_openmm(conf_index, filestore, peptide):
 	receptor = Receptor.frompdb(filestore + '/4_SMINA_data/09_minimized_receptors/receptor_' + str(conf_index) + ".pdb")
 	add_sidechains(receptor.pdb_filename, filestore, add_hydrogens="Yes", keep_IDs=True)
 
-	add_sidechains(filestore + '/4_SMINA_data/08_anchor_filtering/peptide_' + str(conf_index) + ".pdb", 
-				   filestore, add_hydrogens="Yes", keep_IDs=True)
-
 	# 2. Unify peptide and receptor together and create a new pMHC complex
 	pMHC_conformation = filestore + "/5_openMM_conformations/11_pMHC_before_sim/pMHC_" + str(conf_index) + ".pdb"
 	merge_and_tidy_pdb([receptor.pdb_filename,
