@@ -319,7 +319,7 @@ class pMHC(object):
 		self.pdb_filename = filestore + '/5_openMM_conformations/13_connected_pMHC_complexes/pMHC_' + str(peptide_index) + '.pdb'
 		merge_connect_fields(file_list, self.pdb_filename)
 
-	def minimizeConf(self, filestore, best_energy, device='CPU'):
+	def minimizeConf(self, filestore, best_energy, no_constraints_openmm=False, device='CPU'):
 
 		# Read PDB
 		pdb = PDBFile(self.pdb_filename)
@@ -335,21 +335,22 @@ class pMHC(object):
 		system = forcefield.createSystem(modeller.topology, nonbondedMethod=CutoffNonPeriodic, constraints=None)
 
 		# Adding Forces?
-		force_constant = 5000
-		force = CustomExternalForce("k*periodicdistance(x, y, z, x0, y0, z0)^2")
-		force.addGlobalParameter("k", force_constant)
-		force.addPerParticleParameter("x0")
-		force.addPerParticleParameter("y0")
-		force.addPerParticleParameter("z0")
+		if not no_constraints_openmm:
+			force_constant = 5000
+			force = CustomExternalForce("k*periodicdistance(x, y, z, x0, y0, z0)^2")
+			force.addGlobalParameter("k", force_constant)
+			force.addPerParticleParameter("x0")
+			force.addPerParticleParameter("y0")
+			force.addPerParticleParameter("z0")
 
-		ppdb = PandasPdb()
-		ppdb.read_pdb(self.pdb_filename)
-		pdb_df = ppdb.df['ATOM']
-		protein_particles = [atomind - 1 for atomind in pdb_df[pdb_df['atom_name'].isin(["N", "O", "C", "CA"])]['atom_number'].tolist()]
-		particle_indices = []
-		for protein_particle in protein_particles:
-			particle_indices.append(force.addParticle(int(protein_particle), modeller.positions[protein_particle]) )
-		system.addForce(force)
+			ppdb = PandasPdb()
+			ppdb.read_pdb(self.pdb_filename)
+			pdb_df = ppdb.df['ATOM']
+			protein_particles = [atomind - 1 for atomind in pdb_df[pdb_df['atom_name'].isin(["N", "O", "C", "CA"])]['atom_number'].tolist()]
+			particle_indices = []
+			for protein_particle in protein_particles:
+				particle_indices.append(force.addParticle(int(protein_particle), modeller.positions[protein_particle]) )
+			system.addForce(force)
 
 		# Enumerate forces?
 		forces = system.getForces()

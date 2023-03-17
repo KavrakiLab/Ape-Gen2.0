@@ -84,7 +84,7 @@ class Peptide(object):
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Pandora_files/Pandora_DB.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Proper_files/Template_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
@@ -164,7 +164,7 @@ class Peptide(object):
 						temp_template_sequence = alignment.seqB
 						temp_score = score_sequences(temp_sequence_in_question, temp_template_sequence,
 													 anchor_1_list[i], anchor_2_list[i], 
-											         matrix=blosum_62, gap_penalty=-0.25, norm=self_score)
+											         matrix=blosum_62, gap_penalty=-0.26, norm=self_score)
 						if max_score < temp_score:
 							max_score = temp_score
 							best_sequence = temp_sequence_in_question
@@ -195,7 +195,7 @@ class Peptide(object):
 
 		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
 		final_selection = templates.sample(n=1)
-		peptide_template_file = './new_templates/' + final_selection['pdb_code'].values[0]
+		peptide_template_file = './new_templates_final/' + final_selection['pdb_code'].values[0]
 		template_peptide_length = final_selection['peptide_length'].values[0]
 
 		# 3) Calculate anchor alignment, give the anchor differences that were found previously
@@ -313,25 +313,25 @@ class Peptide(object):
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 12 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 12 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 12 --local_only --minimize --flexres " + receptor.flexible_residues + \
+				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		elif receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
-				  " --autobox_add 12 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
+				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 

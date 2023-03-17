@@ -142,6 +142,9 @@ def apegen(args):
 	# --Score_with_open_mm?
 	score_with_openmm = args.score_with_openmm
 
+	# Do not apply constraints on the backbone when applying openMM
+	no_constraints_openmm = args.no_constraints_openmm
+
 	# - Number of rounds : When using multiple rounds, pass best scoring conformation across different rounds
 	num_rounds = args.num_rounds
 
@@ -295,6 +298,7 @@ def apegen(args):
 			# Actual minimization step
 			if verbose:
 				print("\nMinimizing energy...")
+				if no_constraints_openmm: print("Removing backbone constraints from energy minimization!")
 				disable_progress_bar = False
 				leave_progress_bar=False
 			else:
@@ -309,7 +313,7 @@ def apegen(args):
 									peptide=peptide)
 				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
 												leave=leave_progress_bar, disable=disable_progress_bar):
-					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, device)
+					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, no_constraints_openmm, device)
 					with open(filestore + "/5_openMM_conformations/05_per_peptide_results/peptide_" + str(conf_index) + ".log", 'w') as peptide_handler:
 						peptide_handler.write(str(current_round) + "," + str(conf_index) + ",Successfully Modeled," + str(best_energy) + "\n")
 
