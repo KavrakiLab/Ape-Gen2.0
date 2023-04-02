@@ -4,6 +4,7 @@ import shutil
 import sys
 import re
 from pathlib import Path
+import glob
 
 import pandas as pd
 import numpy as np
@@ -114,6 +115,13 @@ def copy_batch_of_files(src, dst, query):
 
 def remove_file(filename):
 	os.remove(filename)
+
+#def remove_file_pattern(filestore, pattern):
+#	print(filestore)
+#	for filename in glob.glob(filestore):
+#		print(filename)
+#		if filename.endswith(pattern):
+#			os.remove(filename)
 	
 def add_sidechains(pdb_filename, filestore, add_hydrogens="Yes", peptide_idx=-1, remove_heterogens=True,
 				   add_solvent=False, keep_IDs=False):
@@ -192,8 +200,9 @@ def select_models(pdb_filename, best_indexes, dst):
 def split_receptor_and_peptide(pdb_file):
 	pdb_path, pdb_filename = os.path.split(pdb_file)
 	pdb_filename = pdb_filename.replace(".pdb", "")
-	receptor_filename = pdb_path + '/' + pdb_filename + "_receptor.pdb"
-	peptide_filename = pdb_path + '/' + pdb_filename + "_peptide.pdb"
+	pdb_filename = pdb_filename.replace("pMHC_", "")
+	receptor_filename = pdb_path + '/Receptor_' + pdb_filename + ".pdb"
+	peptide_filename = pdb_path + '/Peptide_' + pdb_filename + ".pdb"
 
 	receptor = pdb_selchain.run(open(pdb_file, 'r'), ('A', 'B'))
 	with open(receptor_filename, 'w') as file:
