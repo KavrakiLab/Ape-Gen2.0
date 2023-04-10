@@ -146,7 +146,7 @@ class pMHC(object):
 			three_letter_string_2 = ' '.join(three_letter_list[13:])
 			with open(seqres_pdb, 'w') as seqres:
 				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string_1)
-				seqres.write("SEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
+				seqres.write("\nSEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
 			seqres.close()
 		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_native.pdb'
 		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)

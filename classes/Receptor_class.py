@@ -282,7 +282,20 @@ class Receptor(object):
 
 		clean = "lps"
 		call(["python2.7 " + prep_receptor_loc + " -r " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -U" + clean + " > " + filestore + "/prepare_receptor4.log 2>&1"], shell=True)
+		# Control whether the file exists or not (maybe wrap up this into a function?)
+		try:
+			file = open(self.pdbqt_filename, 'r')
+			file.close()
+		except FileNotFoundError:
+			return True
+
 		call(["python2.7 " + pdbqt_to_pdb_loc + " -f " + self.pdbqt_filename + " -o " + filestore + "/receptor_for_smina_temp" + index + ".pdb > " + filestore + "/pdbqt_to_pdb.log 2>&1"], shell=True)
+		# Control whether the file exists or not (maybe wrap up this into a function?)
+		try:
+			file = open(filestore + "/receptor_for_smina_temp" + index + ".pdb", 'r')
+			file.close()
+		except FileNotFoundError:
+			return True
 
 		# Before we continue here, an issue seems to arise. pdbqt_to_pdb.py introduces some segment identifiers that need to be removed?
 		self.pdb_filename = filestore + "/receptor_for_smina_temp" + index + ".pdb"
@@ -296,3 +309,4 @@ class Receptor(object):
 		self.pdb_filename = filestore + "/receptor_for_smina" + index + ".pdb"
 		merge_and_tidy_pdb([filestore + "/receptor_for_smina_temp" + index + ".pdb"], self.pdb_filename)
 		remove_file(filestore + "/receptor_for_smina_temp" + index + ".pdb")
+		return False

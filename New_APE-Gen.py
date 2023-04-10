@@ -24,7 +24,7 @@ from subprocess import call
 from pdbtools import pdb_mkensemble
 import glob
 
-def rescoring_after_openmm(conf_index, filestore, rcd_num_loops, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors):
+def rescoring_after_openmm(conf_index, filestore, rcd_num_loops, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors, min_with_smina):
 
 	new_filestore = filestore + '/5_openMM_conformations'
 
@@ -39,8 +39,9 @@ def rescoring_after_openmm(conf_index, filestore, rcd_num_loops, current_round, 
 
 	receptor = Receptor.frompdb(receptor_file)
 	receptor.doMinimization = True
-	receptor.useSMINA = True
-	receptor.prepare_for_scoring(new_filestore + '/09_minimized_receptors', index=str(conf_index))
+	receptor.useSMINA = min_with_smina
+	receptor_is_not_valid = receptor.prepare_for_scoring(new_filestore + '/09_minimized_receptors', index=str(conf_index))
+	if(receptor_is_not_valid): return
 
 	apply_function_to_file(remove_remarks_and_others_from_pdb, peptide_file, records=('ATOM', 'HETATM', 'TER', 'END '))
 
@@ -286,7 +287,10 @@ def apegen(args):
 		initialize_dir(filestore + '/4_SMINA_data')
 		receptor = receptor_template.receptor
 		add_sidechains(receptor.pdb_filename, filestore)
-		receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
+		receptor_is_not_valid = receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
+		if(receptor_is_not_valid):
+			print("There is something wrong with the receptor file... Check the logs! Aborting...")
+			sys.exit(0)
 
 		# Peptide refinement and scoring with SMINA on the receptor (done in parallel)
 		if verbose: print("Performing peptide refinement and scoring. This may take a while...")
@@ -360,7 +364,7 @@ def apegen(args):
 
 			# Rescoring and re-filtering resulting conformations
 			if verbose: print("\nRescoring and re-filtering resulting conformations:")
-			arg_list = list(map(lambda conf_index: (conf_index, filestore, rcd_num_loops, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors), successful_confs))
+			arg_list = list(map(lambda conf_index: (conf_index, filestore, rcd_num_loops, current_round, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors, min_with_smina), successful_confs))
 			with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
 				results = pool.map(rescoring_after_openmm, arg_list, progress_bar=verbose)
 
