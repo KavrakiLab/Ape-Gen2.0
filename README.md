@@ -53,9 +53,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Fix SEQRES error that appears when modeling peptides of many residues
-- Check validity of receptor when rescoring after openMM; Sometimes the .pdbqt does not exist
-- Correct minor error when re-scoring with openMM; Don't use Vinardo by default.
 - Update SMINA with GNINA and give the appropriate options in the argparser
 - Add the option to choose a template if the user wants it to
 - Renumber the indexes appearing like `5001`, `5002`, `5003` etc. in the results, maybe have an extra column stating where the result came from
@@ -69,7 +66,7 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc. (if possible)
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
 - Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina).
-- Add `num_of_rounds` in homology modelling as an argument. 
+- Add `num_of_rounds` in homology modeling as an argument. 
 - Make function in the places where there is repeated code.
 - Add `number_of_tries` parameter to OpenMM.
 - CSP routine that builds the correct atom names in the flexible file could probably be more optimized (CSP could potentially solve the whole thing instead of per residue?).
