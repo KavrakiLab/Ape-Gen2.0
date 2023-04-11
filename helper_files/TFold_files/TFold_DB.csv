@@ -545,7 +545,6 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 6JTN.pdb,HLA-C*08:02,GADGVGKSAL,10,"2,10","1,2,3,10"
 6JTO.pdb,HLA-C*05:01,GADGVGKSAL,10,"2,10","1,2,3,10"
 6JTP.pdb,HLA-C*08:02,GADGVGKSA,9,"2,9","1,2,3,9"
-6K60.pdb,HLA-C*14:71,RIIPRHLQL,9,"2,9","2,3,6,7,9"
 6KWN.pdb,SLA-1*13:01,NSDTVGWSW,9,"2,9","1,5,2,3,9"
 6KYU.pdb,Anpl-UAA*SD,LRKRQLTVL,9,"2,9","5,2,9"
 6L9N.pdb,H2-Ld,SPSYAYHQF,9,"2,9","1,2,9"
