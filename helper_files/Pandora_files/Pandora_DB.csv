@@ -621,7 +621,6 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 5IND.pdb,HLA-B*58:11,QASQDVKNW,9,"2,9","9,2"
 5IRO.pdb,HLA-A*02:01,LLFGYPVYV,9,"2,9","9,1,2"
 5ISZ.pdb,HLA-A*02:01,GILGFVFTL,9,"2,9","9,1,2"
-5IUE.pdb,Mamu-B*097:01:01:01,ILRWEQD,7,"3,6","4,3,6"
 5IVX.pdb,H2-Dd,RGPGRAFVTI,10,"2,10","10,3,5,2"
 5J6G.pdb,H2-Ld,VGITNVDL,8,"2,8","8,3,5,2"
 5J6H.pdb,H2-Ld,VGITNVDL,8,"2,8","8,3,1,5,2"
