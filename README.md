@@ -53,9 +53,9 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
+- Add option to keep (or remove) intermediate files
 - Update SMINA with GNINA and give the appropriate options in the argparser
 - Add the option to choose a template if the user wants it to
-- Renumber the indexes appearing like `5001`, `5002`, `5003` etc. in the results, maybe have an extra column stating where the result came from
 - Motifs from openvax that are identical in regards to alleles do not exist as is in the file. I need to match e.g. `A*02:17` to `A*02:01` correctly.
 - Add MHCFlurry motifs prediction in the workflow (you can take those from the notebooks created)
 - Add pdb2pqr for protonation.
@@ -65,7 +65,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 - Eventually prune image space by removing unwanted packages from `environment.yml`
 - Add all the folders with the executables to `$PATH`, so that we do not have absolute paths to Autodocktools etc. (if possible)
 - Maybe have an argument for `autobox` size for SMINA scoring (larger values will result in greater time but much more accurate docking)
-- Possibly insert GNINA in workflow somehow? (and test it's RMSD to vinardo/vina).
 - Add `num_of_rounds` in homology modeling as an argument. 
 - Make function in the places where there is repeated code.
 - Add `number_of_tries` parameter to OpenMM.
