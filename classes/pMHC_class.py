@@ -30,33 +30,45 @@ class pMHC(object):
 		self.peptide = peptide # doesn't need PTMs
 		self.receptor = receptor
 
-	def align(self, reference, filestore):
-		initialize_dir(filestore + '/1_alignment_files')
-		#pymol.pymol_argv = ['pymol','-c']
-		#pymol.finish_launching()
+	def remove_peptide(self, filestore):
+
 		p1 = pymol2.PyMOL()
 		p1.start()
-		p1.cmd.load(self.pdb_filename, "mobile")
-		p1.cmd.load(reference.pdb_filename, "ref")
+
+		p1.cmd.load(self.pdb_filename, "ref")
+		p1.cmd.create("sans_peptide", "ref & chain A")
+		self.receptor.pdb_filename = filestore + '/receptor_sans_peptide.pdb'
+		p1.cmd.save(self.receptor.pdb_filename, "sans_peptide")
+
+		p1.stop()
+	
+	def align(self, reference, filestore, template_index):
+		new_filestore = filestore + '/1_alignment_files/' + str(template_index)
+
+		p1 = pymol2.PyMOL()
+		p1.start()
+
+		p1.cmd.load(reference.pdb_filename, "mobile")
+		p1.cmd.load(self.pdb_filename, "ref")
 
 		p1.cmd.align("mobile & chain A", "ref & chain A")
 
-		self.pdb_filename = filestore + '/1_alignment_files/receptor.pdb'
-		p1.cmd.save(self.pdb_filename, "mobile")
-		p1.cmd.save(filestore + '/1_alignment_files/peptide.pdb', "ref")
+		self.pdb_filename = new_filestore + '/receptor.pdb'
+		reference.pdb_filename = new_filestore + '/peptide.pdb'
+		p1.cmd.save(self.pdb_filename, "ref")
+		p1.cmd.save(reference.pdb_filename, "mobile")
 
 		# Also store receptor without peptide and keep that on the receptor part
 		# CAUTION: If receptor template is a result of homology modelling, the peptide is ignored there, so
 		# the receptor will already be without a peptide to begin with. This does not affect this step at all
 		# however
-		p1.cmd.create("mobile_sans_peptide", "mobile & chain A")
-		self.receptor.pdb_filename = filestore + '/1_alignment_files/receptor_sans_peptide.pdb'
-		p1.cmd.save(self.receptor.pdb_filename, "mobile_sans_peptide")
+		p1.cmd.create("sans_peptide", "ref & chain A")
+		self.receptor.pdb_filename = new_filestore + '/receptor_sans_peptide.pdb'
+		p1.cmd.save(self.receptor.pdb_filename, "sans_peptide")
 
-		#pymol.cmd.quit()
 		p1.stop()
 
-	def prepare_for_RCD_v3(self, reference, peptide, filestore):
+	def prepare_for_RCD(self, reference, peptide, filestore, template_index):
 
 		# Let's try a different version of this that does:
 		# 1. Deletion
@@ -66,7 +78,7 @@ class pMHC(object):
 		# Extra steps:
 	    # 1. Keep copies of the reference file before feeding it to RCD. The purpose of this is to be close to the template and optimize on it, like PANDORA.
 
-		initialize_dir(filestore + '/2_input_to_RCD')
+		new_filestore = filestore + '/2_input_to_RCD/' + str(template_index)
 
 		# 1. Deletion routine:
 
@@ -92,12 +104,10 @@ class pMHC(object):
 
 		# 1e. Store
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
-		anchor_pdb = filestore + '/2_input_to_RCD/2_peptide_del.pdb'
+		anchor_pdb = new_filestore + '/2_peptide_del.pdb'
 		ppdb_peptide.to_pdb(path=anchor_pdb, records=['ATOM'], gz=False, append_newline=True)
-		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_del.pdb'
+		anchored_MHC_file_name = new_filestore + '/anchored_pMHC_del.pdb'
 		merge_and_tidy_pdb([self.receptor.pdb_filename, anchor_pdb], anchored_MHC_file_name)
-
-		print('\tNecessary residue Deletions completed!')
 
 		# 2. Mutate
 
@@ -117,19 +127,16 @@ class pMHC(object):
 				pass
 			i += 1
 			j += 1
-		print(mutation_list)
 
 		# 2b. Apply mutations using the mutation list
-		apply_mutations(anchored_MHC_file_name, filestore, mutation_list)
-
-		print('\tNecessary residue Mutations completed!')
+		apply_mutations(anchored_MHC_file_name, new_filestore, mutation_list)
 
 		# 3. Insert
 
 		# 3a. To make the insert, the SEQRES field needs to be added on top of the file
 		# See documentation: https://pdb101.rcsb.org/learn/guide-to-understanding-pdb-data/primary-sequences-and-the-pdb-format
 		# Obviously, this is a pain, because depending on the size of the peptide, there are different conventions:
-		seqres_pdb = filestore + '/2_input_to_RCD/seqres.pdb'
+		seqres_pdb = new_filestore + '/seqres.pdb'
 		three_letter_list = [all_one_to_three_letter_codes[aa] for aa in list(peptide.sequence)]
 		if len(three_letter_list) <= 9:
 			three_letter_string = ' '.join(three_letter_list)
@@ -148,16 +155,14 @@ class pMHC(object):
 				seqres.write("SEQRES   1 C   " + str(len(three_letter_list)) + "  " + three_letter_string_1)
 				seqres.write("\nSEQRES   2 C   " + str(len(three_letter_list)) + "  " + three_letter_string_2)
 			seqres.close()
-		anchored_MHC_file_name_seqres = filestore + '/2_input_to_RCD/anchored_pMHC_native.pdb'
+		anchored_MHC_file_name_seqres = new_filestore + '/anchored_pMHC_native.pdb'
 		merge_and_tidy_pdb([seqres_pdb, anchored_MHC_file_name], anchored_MHC_file_name_seqres)
 
 		# 3b. Inserting the extra amino acids with PDBFixer:
-		add_missing_residues(anchored_MHC_file_name_seqres, filestore)
-
-		print('\tNecessary residue Insertions completed!')
+		add_missing_residues(anchored_MHC_file_name_seqres, new_filestore)
 
 		# Keep copies of the peptide file separately, as it will be used for refinement downstream:
-		filter_chains(anchored_MHC_file_name_seqres, ("C",), filestore + "/2_input_to_RCD/model_0.pdb")
+		filter_chains(anchored_MHC_file_name_seqres, ("C",), new_filestore + "/model_" + str(template_index) + ".pdb")
 
 		# Keep only the backbone in the end:
 		ppdb_peptide.read_pdb(anchored_MHC_file_name_seqres)
@@ -175,7 +180,7 @@ class pMHC(object):
 		pdb_df_peptide.update(pdb_df_peptide['residue_number'] + 1 - min_residue_number) 
 
 		ppdb_peptide.df['ATOM'] = pdb_df_peptide
-		anchored_MHC_file_name = filestore + '/2_input_to_RCD/anchored_pMHC_proper.pdb'								
+		anchored_MHC_file_name = new_filestore + '/anchored_pMHC_proper.pdb'								
 		ppdb_peptide.to_pdb(path=anchored_MHC_file_name, records=['ATOM'], gz=False, append_newline=True)
 
 		# We also have to store the N-terminus and the C-terminus of the peptide for the refinement
@@ -188,22 +193,21 @@ class pMHC(object):
 
 		N_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(1, anchor_1)))]
 		ppdb_peptide.df['ATOM'] = N_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/N_ter.pdb', 
+		ppdb_peptide.to_pdb(path=new_filestore + '/N_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
 		
 		C_terminus = pdb_df_peptide[pdb_df_peptide['residue_number'].isin(list(range(anchor_2, len(peptide.sequence) + 1)))]
 		ppdb_peptide.df['ATOM'] = C_terminus
-		ppdb_peptide.to_pdb(path=filestore + '/2_input_to_RCD/C_ter.pdb', 
+		ppdb_peptide.to_pdb(path=new_filestore + '/C_ter.pdb', 
 							records=['ATOM'], gz=False, append_newline=True)
 		# DONE!
 
-	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, num_loops, loop_score, non_sampled_confs, filestore):
-		
-		initialize_dir(filestore + '/3_RCD_data')
-		pwd = os.getcwd()
+	def RCD(self, peptide, RCD_dist_tol, rcd_num_loops, filestore, template_index):
 
+		pwd = os.getcwd()
+		os.chdir(filestore + "/2_input_to_RCD/" + str(template_index) + "/")
+		
 		# Create loops.txt file
-		os.chdir(filestore + "/2_input_to_RCD/")
 		# The canonical case is the N-termini anchor being in pos 2, however, if it is in pos 1, just because we need
 		# to have a Start-2 Start-1 config, the N-termini endpoint must be in pos 3
 		one_end = peptide.primary_anchors[0] + 1
@@ -217,17 +221,24 @@ class pMHC(object):
 		loops.close()
 
 		# Call RCD
-		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/helper_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " --bench loops.txt >> ../3_RCD_data/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_proper_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_proper_rmsd.txt"], shell=True)
+		call(["rcd -e 1 -x " + pwd + "/RCD_required_files/dunbrack.bin --energy_file " + pwd + "/helper_files/loco.score -o . -d " + str(RCD_dist_tol) + " -n " + str(rcd_num_loops) + " --bench loops.txt >> ../../3_RCD_data/" + str(template_index) + "/rcd.log 2>&1 && awk '{$1=$1};1' anchored_pMHC_proper_rmsd.txt > korp_tmp.txt && mv korp_tmp.txt anchored_pMHC_proper_rmsd.txt"], shell=True)
 
 		# Move files to back to destination folder
-		move_batch_of_files('./', '../3_RCD_data/', query="anchored_pMHC_proper_")
-		move_batch_of_files('./', '../3_RCD_data/', query="results")
-		os.chdir("../3_RCD_data/")
+		move_batch_of_files('./', '../../3_RCD_data/' + str(template_index) + '/', query="anchored_pMHC_proper_")
+		move_batch_of_files('./', '../../3_RCD_data/' + str(template_index) + '/', query="results")
+		os.chdir(pwd)
+
+		# DONE!
+		
+	def loop_ranking(self, rcd_num_loops, num_loops, loop_score, non_sampled_confs, filestore, template_index):
+		
+		pwd = os.getcwd()
+		os.chdir(filestore + '/3_RCD_data/' + str(template_index) + '/')
 
 		korp_res = pd.read_csv("anchored_pMHC_proper_rmsd.txt", sep = " ", comment='#', header=None)
 		korp_res.columns = ['Loop', 'RMSD', 'Bump', 'BumpEx', 'BumpIn', 'Energy']
 		if loop_score == 'KORP':
-			call([pwd + "/RCD_required_files/korpe ../2_input_to_RCD/anchored_pMHC_proper.pdb --loops anchored_pMHC_proper_closed.pdb --score_file " + pwd + "/RCD_required_files/korp6Dv1.bin -e 5 -o korp_res >> korp.log 2>&1 && awk '{$1=$1};1' korp_res.txt > korp_tmp.txt && mv korp_tmp.txt korp_res.txt"], shell=True)
+			call([pwd + "/RCD_required_files/korpe ../../2_input_to_RCD/" + str(template_index) + "/anchored_pMHC_proper.pdb --loops anchored_pMHC_proper_closed.pdb --score_file " + pwd + "/RCD_required_files/korp6Dv1.bin -e 5 -o korp_res >> korp.log 2>&1 && awk '{$1=$1};1' korp_res.txt > korp_tmp.txt && mv korp_tmp.txt korp_res.txt"], shell=True)
 			korp_res = pd.read_csv("korp_res.txt", sep = " ", comment='#', header=None)
 			korp_res.columns = ['Loop', 'Energy']
 			best_indexes = korp_res[korp_res['Loop'] != 0].sort_values(by=['Energy'])['Loop'].head(num_loops).astype(int).tolist()
@@ -238,9 +249,6 @@ class pMHC(object):
 		else:
 			best_indexes = random.sample(range(rcd_num_loops), num_loops)
 		best_indexes = [idx + 1 for idx in best_indexes]
-		
-		# Score loops if the user wants it to
-		if verbose(): print("RCD done!")
 
 		# Split the output into files, as the output .pdb has many models			   
 		splitted = pdb_splitmodel.run(pdb_splitmodel.check_input(["./anchored_pMHC_proper_closed.pdb"]), outname="model")
