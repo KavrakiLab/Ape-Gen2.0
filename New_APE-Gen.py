@@ -227,9 +227,6 @@ def apegen(args):
 	# --clean_rcd: Remove RCD folder at the end of each round?
 	cleanRCD = args.clean_rcd
 
-	# --force_restart: Force restart of APE-Gen *ONLY* in the first round and *ONLY* if no conformations are produced
-	force_restart = args.force_restart
-
 	# --anchor_selection: Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)
 	anchor_selection = args.anchor_selection
 
