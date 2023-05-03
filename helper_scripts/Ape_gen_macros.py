@@ -276,8 +276,8 @@ def create_csv_from_list_of_files(csv_filename, list_of_files):
 
 def pretty_print_analytics(csv_location, verbose=True):
 
-	results_csv = pd.read_csv(csv_location, names=['Round', 'Peptide index', 'Debug', 'Affinity'])
-	results_csv.sort_values(by=['Round', 'Peptide index'], inplace=True)
+	results_csv = pd.read_csv(csv_location, names=['Peptide index', 'Debug', 'Affinity'], dtype=str)
+	results_csv.sort_values(by=['Peptide index'], inplace=True)
 	results_csv.to_csv(csv_location, index=False)
 
 	results_csv = results_csv[results_csv['Affinity'] != '-']
@@ -553,3 +553,7 @@ def predict_anchors_PMBEC(peptide, MHC):
 		anchors = extract_anchors_PMBEC(peptide, MHC, frequencies)
 		anchor_status = "Known"
 	return anchors, anchor_status
+
+def split_to_equal_parts(n, k):
+    d,r = divmod(n, k)
+    return [d+1]*r + [d]*(k-r)

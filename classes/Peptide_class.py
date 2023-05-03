@@ -12,6 +12,7 @@ import sys
 import os
 import re
 import pickle as pkl
+from copy import deepcopy
 
 from helper_scripts.Ape_gen_macros import apply_function_to_file, remove_file,                     \
 											rev_anchor_dictionary, all_three_to_one_letter_codes,  \
@@ -79,7 +80,7 @@ class Peptide(object):
 			       primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, 
 			       tilted_sequence=tilted_sequence, index=peptide_index)
 
-	def get_peptide_template(self, receptor_allotype, anchors, anchor_selection, cv=''):
+	def get_peptide_templates(self, receptor_allotype, anchors, max_no_templates, similarity_threshold, cv=''):
 
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
@@ -183,44 +184,62 @@ class Peptide(object):
 
 		templates['Peptide_similarity'] = score_list
 
+		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
+		templates = templates.sort_values(by=['Similarity_score'], ascending=False).dropna()
+
 		# 2c. Try filtering by organism first; if that does not bring options, try all!	
-		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty and anchor_status == "Known":
-			templates = templates[templates['MHC'].str[:3] == receptor_allotype[:3]]
+		if not templates[templates['MHC'].str[:3] == receptor_allotype[:3]].empty:
+			templates_filt = deepcopy(templates[templates['MHC'].str[:3] == receptor_allotype[:3]])
+		else:
+			templates_filt = deepcopy(templates)
 			
 		# 2d. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
-		# If there are duplicate results, select at one at random!
-		templates['Similarity_score'] = 0.5*templates['MHC_similarity'] + 0.5*templates['Peptide_similarity']
+		final_selection = templates_filt[templates_filt['Similarity_score'] > 0]
+		cumulative_sum = final_selection['Similarity_score'].sum()
+		print("CUMMM: ", cumulative_sum)
+		final_selection = final_selection[final_selection['Similarity_score'].cumsum() <= similarity_threshold]
+		if (final_selection.empty) or (cumulative_sum < similarity_threshold):
+			final_selection = templates[templates['Similarity_score'] > 0] 
+			final_selection = final_selection[final_selection['Similarity_score'].cumsum() <= similarity_threshold]
+			if final_selection.empty:
+				print("No appropriate template an be found for the given peptide-MHC input! Aborting...")
+				sys.exit(0)	
 
-		print(templates[['peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score', 'Anchor_diff_1']].sort_values(by=['Similarity_score'], ascending=False).head(20))
+		print(final_selection[['pdb_code', 'peptide', 'MHC', 'MHC_similarity', 'Peptide_similarity', 'Similarity_score']])
 
-		templates = templates[templates['Similarity_score'] == templates['Similarity_score'].max()].dropna()
-		final_selection = templates.sample(n=1)
-		peptide_template_file = './new_templates_final/' + final_selection['pdb_code'].values[0]
-		template_peptide_length = final_selection['peptide_length'].values[0]
+		return final_selection, anchors, anchor_status
+
+	def initialize_peptide_template(self, template_entry, anchors, anchor_status):
+
+		int_anchors = [int(pos) for pos in anchors.split(",")]
+		sequence_length = len(self.sequence)
+
+		peptide_template_file = './new_templates_final/' + template_entry['pdb_code'].values[0]
+		template_peptide_length = template_entry['peptide_length'].values[0]
 
 		# 3) Calculate anchor alignment, give the anchor differences that were found previously
 		if anchor_status == "Known":
 			tilted_sequence, template_tilted_sequence = anchor_alignment(self.sequence, 
-																		 final_selection['peptide'].values[0], 
-															         	 final_selection['Anchor_diff_1'].values[0], 
-															         	 final_selection['Anchor_diff_2'].values[0])
+																		 template_entry['peptide'].values[0], 
+															         	 template_entry['Anchor_diff_1'].values[0], 
+															         	 template_entry['Anchor_diff_2'].values[0])
 		else:
-			tilted_sequence, template_tilted_sequence = final_selection['Tilted_sequence'].values[0], final_selection['Tilted_template_sequence'].values[0]
+			tilted_sequence, template_tilted_sequence = template_entry['Tilted_sequence'].values[0], template_entry['Tilted_template_sequence'].values[0]
 
 		# 4) Extract the anchor position numbers for the anchor tolerance step!
 		# CAUTION: This could cause inconsistences if the peptide sizes differ greatly, but not really, just making the anchor tolerance step a little bit more obscure
-		template_major_anchors = [int(anchor) for anchor in final_selection['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
-		template_secondary_anchors = [int(anchor) for anchor in final_selection['Secondary_anchors'].apply(lambda x: x.split(",")).values[0]]
+		template_major_anchors = [int(anchor) for anchor in template_entry['Major_anchors'].apply(lambda x: x.split(",")).values[0]]
+		template_secondary_anchors = [int(anchor) for anchor in template_entry['Secondary_anchors'].apply(lambda x: x.split(",")).values[0]]
 		if anchor_status == "Known": 
 			peptide_primary_anchors = int_anchors
 		else:
 			peptide_primary_anchors = template_major_anchors
 			peptide_primary_anchors[1] = template_major_anchors[1] - (len(tilted_sequence) - len(tilted_sequence.rstrip('-'))) # This to adjust the C-terminus anchor when the template is larger in size
-			peptide_primary_anchors = [max(1, anchor - final_selection['Anchor_diff_1'].values[0]) for anchor in template_major_anchors] # Anchor adjustement step (see below)
+			peptide_primary_anchors = [max(1, anchor - template_entry['Anchor_diff_1'].values[0]) for anchor in template_major_anchors] # Anchor adjustement step (see below)
 
 		# 5) Anchors adjustment!
 		# Filtering Anchors that won't make sense give the left/right tilt
-		Anchor_diff_1 = final_selection['Anchor_diff_1'].values[0]
+		Anchor_diff_1 = template_entry['Anchor_diff_1'].values[0]
 		peptide_second_anchors = [anchor - Anchor_diff_1 for anchor in template_secondary_anchors]
 		peptide_second_anchors = [anchor for anchor in peptide_second_anchors if anchor > 0 and anchor <= sequence_length]
 		template_secondary_anchors = [anchor for anchor in template_secondary_anchors if anchor - Anchor_diff_1 > 0 and int(anchor) - Anchor_diff_1 <= sequence_length]
@@ -232,12 +251,6 @@ class Peptide(object):
 														secondary_anchors=template_secondary_anchors,
 														tilted_sequence=template_tilted_sequence))
 
-		if verbose(): 
-			print("Done with choosing a peptide template!")
-			print("\tGot " + final_selection['pdb_code'].values[0] + "!")
-			print("\tPeptide is " + final_selection['peptide'].values[0])
-			print("\tMHC is " + final_selection['MHC'].values[0])
-
 		# 6) Return both the peptide object, as well as the peptide template that was chosen
 		self.pdb_filename = None
 		self.primary_anchors = peptide_primary_anchors 
@@ -246,7 +259,7 @@ class Peptide(object):
 
 		return peptide_template
 
-	def perform_PTM(self, filestore, current_round):
+	def perform_PTM(self, filestore):
 
 		# Unfortunately, I have to revert to stupid system calls here, because I cannot call pytms from python
 		# Maybe one day...
@@ -267,7 +280,7 @@ class Peptide(object):
 		pymol_failed = any(residue in list(standard_three_to_one_letter_code.keys()) for residue in residues)
 		if pymol_failed == True:
 			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Pymol PTM failed!,-\n")
+				peptide_handler.write(str(self.index) + ",Pymol PTM failed!,-\n")
 			return True	
 
 		# A. Chain A. I want to make it into chains C as before
@@ -284,7 +297,7 @@ class Peptide(object):
 
 		return False
 
-	def prepare_for_scoring(self, filestore, current_round):
+	def prepare_for_scoring(self, filestore):
 		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/04_pdbqt_peptides/peptide_" + str(self.index) + ".pdbqt"
 		clean = "lps"
@@ -294,6 +307,8 @@ class Peptide(object):
 		try:
 			seq = pdb_tofasta.run(open(self.pdbqt_filename, 'r'), multi=False)
 		except FileNotFoundError:
+			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(self.index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
 
 		number_1 = count_number_of_atoms(self.pdb_filename)
@@ -301,7 +316,7 @@ class Peptide(object):
 		if(number_1 != number_2):
 			remove_file(self.pdbqt_filename)
 			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Rejected by prepare_ligand4.py,-\n")
+				peptide_handler.write(str(self.index) + ",Rejected by prepare_ligand4.py,-\n")
 			return True
 		else:
 			return False
@@ -321,7 +336,6 @@ class Peptide(object):
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
-			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
 		elif receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
@@ -333,7 +347,14 @@ class Peptide(object):
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 4 --local_only --minimize --energy_range 100 --out " + self.pdb_filename + " > " + \
 				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
-			#move_file(receptor.pdb_filename, filestore + "/receptor_smina_min.pdb")
+		atom_number = count_number_of_atoms(self.pdb_filename)
+		if(atom_number == 0):
+			remove_file(self.pdb_filename)
+			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
+				peptide_handler.write(str(self.index) + ",Rejected by SMINA (possibly overlapping atoms),-\n")
+			return True
+		else:
+			return False
 
 	def score_with_SMINA(self, filestore, receptor):
 		self.pdb_filename = filestore + "/06_scoring_results/model_" + str(self.index) + ".pdb" 
@@ -342,7 +363,7 @@ class Peptide(object):
 			  " > " + filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
 		move_file(receptor.pdb_filename, filestore + "/09_minimized_receptors/receptor_" + str(self.index) + ".pdb")    
 
-	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, current_round, rcd_num_loops):
+	def compute_anchor_tolerance(self, filestore, receptor, peptide_template_anchors_xyz, anchor_tol, rcd_num_loops):
 
 		ppdb_peptide = PandasPdb()
 		ppdb_peptide.read_pdb(self.pdb_filename)
@@ -359,14 +380,14 @@ class Peptide(object):
 
 		# If difference is smaller than the tolerance, keep the file, else don't (exception for the native one, but it'll probably pass anyway)
 		anchor_difference = np.linalg.norm(pdb_peptide_anchors_xyz - peptide_template_anchors_xyz, axis=1)
-		if (np.all(anchor_difference < anchor_tol)) or (self.index > rcd_num_loops):
+		if (np.all(anchor_difference < anchor_tol)):
 			
 			# Keep the scores of the remaining survivors
 			with open(self.pdb_filename, 'r') as peptide_handler:
 				next(peptide_handler) # Skipping first line
 				affinity = peptide_handler.readline().replace("\n", "").split(" ")[2]
 			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Successfully Modeled," + str(affinity) + "\n")
+				peptide_handler.write(str(self.index) + ",Successfully Modeled," + str(affinity) + "\n")
 
 			dst = filestore + "/08_anchor_filtering/peptide_" + str(self.index) + ".pdb"
 			copy_file(self.pdb_filename, dst)
@@ -379,17 +400,17 @@ class Peptide(object):
 			
 			# Keep a log for the anchor difference
 			with open(filestore + "/08_anchor_filtering/peptide_" + str(self.index) + ".log", 'a+') as anchor_log:
-				anchor_log.write(str(current_round) + "," + str(self.index) + "," + ','.join(map(str, anchor_difference))) 
+				anchor_log.write(str(self.index) + "," + ','.join(map(str, anchor_difference))) 
 			
 			# Keep this result for final printing
 			faulty_positions = (anchor_difference > anchor_tol)*self.secondary_anchors
 			faulty_positions = " and ".join(np.char.mod('%d', faulty_positions[faulty_positions != 0]))
 			with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as peptide_handler:
-				peptide_handler.write(str(current_round) + "," + str(self.index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
+				peptide_handler.write(str(self.index) + ",Anchor tolerance violated in positions " + faulty_positions + ",-\n")
 			
 			return True
 
-	def fix_flexible_residues(self, filestore, receptor, current_round):
+	def fix_flexible_residues(self, filestore, receptor):
 
 		# Make the flexible receptor output from the SMINA --out_flex argument
 		#minimized_receptor_loc = filestore + "/4_SMINA_data/09_minimized_receptors/receptor_" + str(self.index) + ".pdb"
@@ -444,7 +465,7 @@ class Peptide(object):
 				# A solution was not found: Most probable case is that the CONECT fields are also broken, meaning that the conformation is invalid as it is. 
 				# os.remove(filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb") ## DON'T DELETE FOR KNOW, IN CASE WE HAVE THIS ISSUE AGAIN, INSPECT THE OUTPUT
 				with open(filestore + "/05_per_peptide_results/peptide_" + str(self.index) + ".log", 'w') as flexible_log:
-					flexible_log.write(str(current_round) + "," + str(self.index) + ",Flexible receptor conformation received was faulty,-\n") 
+					flexible_log.write(str(self.index) + ",Flexible receptor conformation received was faulty,-\n") 
 				return True
 
 			sub_pdb = sub_pdb.drop(columns='atom_name').merge(matching, how='inner', on='atom_number')
