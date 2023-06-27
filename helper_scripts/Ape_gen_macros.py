@@ -116,12 +116,9 @@ def copy_batch_of_files(src, dst, query):
 def remove_file(filename):
 	os.remove(filename)
 
-#def remove_file_pattern(filestore, pattern):
-#	print(filestore)
-#	for filename in glob.glob(filestore):
-#		print(filename)
-#		if filename.endswith(pattern):
-#			os.remove(filename)
+def remove_dirs(directory_list):
+	for directory in directory_list:
+		shutil.rmtree(directory)
 	
 def add_sidechains(pdb_filename, filestore, add_hydrogens="Yes", peptide_idx=-1, remove_heterogens=True,
 				   add_solvent=False, keep_IDs=False):

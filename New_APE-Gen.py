@@ -5,7 +5,8 @@ from helper_scripts.Ape_gen_macros import apply_function_to_file, replace_chains
 											copy_file, pretty_print_analytics, move_batch_of_files,\
 											copy_batch_of_files, split_receptor_and_peptide,	   \
 											remove_remarks_and_others_from_pdb, replace_HETATM,    \
-											delete_elements, split_to_equal_parts, verbose, set_verbose                  \
+											delete_elements, split_to_equal_parts, remove_dirs,    \
+											verbose, set_verbose                  \
 
 from classes.Peptide_class import Peptide
 from classes.Receptor_class import Receptor
@@ -236,6 +237,9 @@ def apegen(args):
 	# --similarity_threshold: Score [0-1] that defines if a peptide template will be considered as a candidate during the modelling process.
 	similarity_threshold = args.similarity_threshold
 
+	# --keep_all_files: Keep all intermediate generated files from the modeling process
+	keep_all_files = args.keep_all_files
+
 	# --cv: ONLY FOR TESTING (to be removed in the final version)
 	cv = args.cv
 
@@ -386,10 +390,10 @@ def apegen(args):
 			print("\nMinimizing energy...")
 			if no_constraints_openmm: print("Removing backbone constraints from energy minimization!")
 			disable_progress_bar = False
-			leave_progress_bar=False
+			leave_progress_bar = False
 		else:
 			disable_progress_bar = True
-			leave_progress_bar=True
+			leave_progress_bar = True
 
 		for conf_index in tqdm(successful_confs, desc="pMHC conf", position=0, disable=disable_progress_bar):
 
@@ -443,6 +447,13 @@ def apegen(args):
 				  best_conf_dir + '/min_energy_system.pdb')
 		copy_file(best_conf_dir + '/05_per_peptide_results/peptide_' + str(best_conformation_index) + '.log',
 				  best_conf_dir + '/min_energy.log')
+
+	# Delete intermediate files if flag is true
+	if not keep_all_files:
+		dir_list = ['/4_SMINA_data', '/3_RCD_data', '/2_input_to_RCD', '/1_alignment_files']
+		if(score_with_openmm and results_csv.shape[0] > 0):
+			dir_list.append('/5_openMM_conformations')
+		remove_dirs([filestore + dir for dir in dir_list])
 
 	print("\n\nEnd of APE-Gen")
 
