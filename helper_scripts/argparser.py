@@ -27,4 +27,5 @@ def APE_Gen_parser():
 	parser.add_argument("--similarity_threshold", type=float, default=1, help='Score [0-1] that defines if a peptide template will be considered as a candidate during the modelling process.')
 	parser.add_argument("--max_no_templates", type=int, default=5, help='The maximum number of templates that will be used in the modelling process.')
 	parser.add_argument("--no_constraints_openmm", action="store_true", help='Do not apply constraints on the backbone when applying openMM')
+	parser.add_argument("--keep_all_files", action="store_true", help='Keep all intermediate generated files from the modeling process')
 	return parser
