@@ -204,7 +204,6 @@ pdb_code,MHC,peptide,peptide_length,Major_anchors,Secondary_anchors
 3FQR.pdb,HLA-A*02:01,YLDSGIHSGA,10,"2,10","2,10"
 3FQT.pdb,HLA-A*02:01,GLLGSPVRA,9,"2,9","1,2,9"
 3FQW.pdb,HLA-A*02:01,RVASPTSGV,9,"2,9","2,9"
-3FT3.pdb,HLA-A*02:01,VLHDDLLEA,9,"2,9","9,1,2,6"
 3FT4.pdb,HLA-A*02:01,VLRDDLLEA,9,"2,9","9,6,1,2"
 3FTG.pdb,H2-Db,ASAENMETM,9,"2,9","1,5,2,9"
 3GIV.pdb,HLA-A*02:01,SLFNTVATLY,10,"2,9","1,2,9"
