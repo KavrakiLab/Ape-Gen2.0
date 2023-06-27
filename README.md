@@ -53,7 +53,6 @@ python New_APE-Gen.py ARpSEpTEVIpYS HLA-A*11:01 --verbose --score_with_openmm
 ### Main Workflow:
 
 #### Minor issues:
-- Add option to keep (or remove) intermediate files
 - Update SMINA with GNINA and give the appropriate options in the argparser
 - Add the option to choose a template if the user wants it to
 - Motifs from openvax that are identical in regards to alleles do not exist as is in the file. I need to match e.g. `A*02:17` to `A*02:01` correctly.
