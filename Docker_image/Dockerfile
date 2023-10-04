@@ -34,66 +34,52 @@ RUN apt-get update && \
         wget \
         vim
 
-RUN ["/bin/bash", "-c", "wget http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh"]
-RUN chmod 0755 Miniconda3-latest-Linux-x86_64.sh
-RUN bash Miniconda3-latest-Linux-x86_64.sh -b -p /conda
-ENV PATH "/conda/bin:$PATH"
+RUN ["/bin/bash", "-c", "wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge-pypy3-Linux-x86_64.sh"]
+RUN chmod 0755 Miniforge-pypy3-Linux-x86_64.sh
+RUN bash Miniforge-pypy3-Linux-x86_64.sh -b -p /mamba
+ENV PATH "/mamba/bin:$PATH"
 
 # environment.yml has pdbfixer, numpy, mdtraj and openmm
 COPY ./Docker_image/environment.yml /environment.yml
-RUN conda env create -f /environment.yml
+RUN mamba env create -f /environment.yml
 RUN echo "source activate apegen" >> ~/.bashrc
-ENV PATH "/conda/envs/apegen/bin:$PATH"
-
-# This is manual, but won't work
-#RUN conda create --name apegen python=3.6 \
-#    && echo "conda activate apegen" >> ~/.bashrc \
-#    && conda init bash \
-#    && conda activate apegen \
-#    && conda update conda \
-#    && conda install -c schrodinger pymol \ 
-#    && conda install -c conda-forge/label/cf202003 requests \
-#    && conda install -c conda-forge pdbfixer \
-#    && conda install -c conda-forge numpy \
-#    && conda install -c conda-forge mdtraj \
-#    && conda install -c conda-forge openmm \
-#    && conda install -c conda-forge biopython \
-#    && conda install -c salilab modeller \
-#    && conda install -c conda-forge beautifulsoup4
-#ENV PATH "/conda/envs/apegen/bin:$PATH"
+ENV PATH "/mamba/envs/apegen/bin:$PATH"
 
 # These are okay outside environment.yml because they install to PATH
 # Perhaps better if inside yml?
-RUN conda install -c bioconda smina
-RUN conda install -c bioconda autodock-vina
+RUN mamba install -c bioconda smina
+RUN mamba install -c bioconda autodock-vina
 
-# This for some reason creates conflicts in the conda .yml file, not sure as to why
-RUN pip install mpire
-RUN pip install pdb-tools
+# This for some reason creates issues with smina, I am not sure why
+RUN pip install mpire # 
+# RUN pip install pdb-tools
 
 # Probably you should be cloning the directory if you want to build the image yourself?
 # Makes sense for other people to download I guess
 # RUN git clone https://github.com/KavrakiLab/APE-Gen.git
 ADD . $HOME/data/
-RUN ls /data/
+
 # replace files that cause warnings and errors
 # COPY /replacement_files/replace_files.sh /replace_files.sh
 # RUN echo "sh /replace_files.sh" >> ~/.bashrc
 
 # RCD
-RUN conda install -c intel mkl
-ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/conda/lib/"
+RUN mamba install -c intel mkl # This is here, libraries are missing if I leave it in the .yml
+ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/mamba/lib/"
 RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
     cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin && \
     cp RCD_v1.40_Linux_20190228/dunbrack.bin /data/RCD_required_files/dunbrack.bin
 
-#WORKDIR /data
-
+# KORPE
 RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/down-korp|grep Korp6Dv1.txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
     cp Korp6Dv1/korp6Dv1.bin /data/RCD_required_files/korp6Dv1.bin && \
     cp Korp6Dv1/bin/korpe /data/RCD_required_files/korpe
 
+# Change dir
 WORKDIR /data
+
+RUN cp ./helper_scripts/prepare_ligand4.py /mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/ # Functional
+RUN grep -rl 'simtk.openmm' /mamba/ | xargs sed -i 's/simtk.openmm/openmm/g' # Avoiding warnings when importing
 
 ENTRYPOINT ["bash"]
 

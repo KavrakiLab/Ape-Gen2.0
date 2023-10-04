@@ -8,20 +8,14 @@ dependencies:
   - python=3.7
   - pdbfixer
   - numpy
-  - mdtraj
   - openmm
-  - biopython
-  - modeller
-  - beautifulsoup4
-  - requests
+  - modeller 
   - pymol
   - biopandas
+  - biopython
   - mgltools
-  - openbabel
-  - prody 
-  - tabulate 
   - openmmforcefields
   - python-constraint
-  - parmed 
-  - nltk 
   - scikit-learn
+  - tabulate
+  - pdb-tools 

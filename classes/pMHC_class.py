@@ -93,8 +93,8 @@ class pMHC(object):
 		# 1c. Calculate anchor differences between reference and peptide in question
 		(sequence_in_question, template_sequence) = (peptide.tilted_sequence, reference.peptide.tilted_sequence)
 
-		print(sequence_in_question)
-		print(template_sequence)
+		#print(sequence_in_question)
+		#print(template_sequence)
 
 		indexes_for_deletion = [pos + 1 for pos, char in enumerate(sequence_in_question) if char == '-']
 		indexes_for_deletion = [pos - (len(template_sequence) - len(template_sequence.lstrip('-'))) if pos > 5 else pos for pos in indexes_for_deletion] # Adjustment for C-terminus indexes when there is a tilt from the front (example: 2FWO).

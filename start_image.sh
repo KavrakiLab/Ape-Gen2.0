@@ -1,1 +1,1 @@
-docker run -it --rm -v $(pwd):/data --workdir "/data" kavrakilab/apegen2.0:latest
+docker run -it --rm kavrakilab/apegen2.0:latest

@@ -14,7 +14,6 @@ from Bio.Align import substitution_matrices
 
 from constraint import *
 
-from nltk import ngrams
 from itertools import zip_longest
 
 # PDBFIXER
