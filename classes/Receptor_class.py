@@ -276,8 +276,8 @@ class Receptor(object):
 
 	def prepare_for_scoring(self, filestore, index=""):
 
-		prep_receptor_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
-		pdbqt_to_pdb_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
+		prep_receptor_loc = "/mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_receptor4.py"
+		pdbqt_to_pdb_loc = "/mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/pdbqt_to_pdb.py"
 		self.pdbqt_filename = filestore + "/receptor_for_smina" + index + ".pdbqt"
 
 		clean = "lps"

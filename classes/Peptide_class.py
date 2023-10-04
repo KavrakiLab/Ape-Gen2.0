@@ -196,7 +196,6 @@ class Peptide(object):
 		# 2d. Overall similarity (0.5 is empirical, might make it a parameter, we'll see...)
 		final_selection = templates_filt[templates_filt['Similarity_score'] > 0]
 		cumulative_sum = final_selection['Similarity_score'].sum()
-		print("CUMMM: ", cumulative_sum)
 		final_selection = final_selection[final_selection['Similarity_score'].cumsum() <= similarity_threshold]
 		if (final_selection.empty) or (cumulative_sum < similarity_threshold):
 			final_selection = templates[templates['Similarity_score'] > 0] 
@@ -298,7 +297,7 @@ class Peptide(object):
 		return False
 
 	def prepare_for_scoring(self, filestore):
-		prep_peptide_loc = "/conda/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
+		prep_peptide_loc = "/mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/prepare_ligand4.py"
 		self.pdbqt_filename = filestore + "/04_pdbqt_peptides/peptide_" + str(self.index) + ".pdbqt"
 		clean = "lps"
 		call(["python2.7 " + prep_peptide_loc + " -l " + self.pdb_filename + " -o " + self.pdbqt_filename + " -A None -Z -U " + clean + " -g -s > " + filestore + "/04_pdbqt_peptides/prepare_ligand4.log 2>&1"], shell=True)
@@ -324,13 +323,13 @@ class Peptide(object):
 	def dock_score_with_SMINA(self, filestore, receptor):
 
 		# SMINA docking and scoring
-		self.pdb_filename =  filestore + "/06_scoring_results/model_" + str(self.index) + ".pdb"
+		self.pdb_filename = filestore + "/06_scoring_results/model_" + str(self.index) + ".pdb"
 		if not receptor.useSMINA and receptor.doMinimization:
 			call(["smina -q --scoring vinardo --out_flex " + filestore + "/07_flexible_receptors/receptor_" + str(self.index) + ".pdb --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
 				  " --autobox_add 4 --local_only --minimize --flexres " + receptor.flexible_residues + \
 				  " --energy_range 100 --out " + self.pdb_filename + " > " + \
-				  filestore + "/06_scoring_results/smina.log 2>&1"], shell=True)
+				  self.pdb_filename + "smina.log 2>&1"], shell=True)
 		elif not receptor.useSMINA and not receptor.doMinimization:
 			call(["smina -q --scoring vinardo --ligand " + self.pdbqt_filename + \
 				  " --receptor " + receptor.pdbqt_filename + " --autobox_ligand " + self.pdbqt_filename + \
