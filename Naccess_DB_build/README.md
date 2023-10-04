@@ -1,5 +1,7 @@
+This is a small README as reference for the Naccess anchor labeling part:
+
 - prepape_templates_for_SASA_analysis_As_only.sh
-Takes the PANDORA dataset and:
+Takes the dataset and:
 	1) Renames the chains
 	2) Checks how many of these .pdbs have ambiguous positions (with A,B,C,Ds)
 	3) and keep only the As for simplicity
@@ -17,4 +19,4 @@ This will basically identify the allele allotypes for each allele sequence, give
 	Results are store in template_names.log
 
 - Make_anchor_spreadsheet.py
-Brings it all together and makes the DB spreadsheet, which is Template_DB_information.csv
+Brings it all together and makes the DB spreadsheet, which is Template_DB.csv
