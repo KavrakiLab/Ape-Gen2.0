@@ -9,7 +9,7 @@ def APE_Gen_parser():
 	parser.add_argument("--num_generated_loops", type=int, default=5000, help='Number of loops to generate with RCD')
 	parser.add_argument("--num_loops_for_optimization", type=int, default=100, help='Number of loops to optimize (that will pass as a result of a loop scoring function)')
 	parser.add_argument("-t", "--RCD_dist_tol", type=float, default=1.0, help='RCD tolerance (in angstroms) of inner residues when performing IK')
-	parser.add_argument("-r", "--rigid_receptor", action="store_true", help='Disable sampling of receptor degrees of freedom specified in flex_res.txt')
+	parser.add_argument("-r", "--rigid_receptor", action="store_true", help='Disable sampling of receptor degrees of freedom specified in ./helper_files/flex_res.txt')
 	parser.add_argument("-v", "--verbose", action="store_true", help='Print extra information for debugging')
 	parser.add_argument("-p", "--save_only_pep_confs", action="store_true", help='Disable saving full conformations (peptide and MHC)')
 	parser.add_argument('--anchors', default="", help='delimited list input', type=str)
