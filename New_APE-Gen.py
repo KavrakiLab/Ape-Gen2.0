@@ -194,7 +194,7 @@ def apegen(args):
 	# --loop_score: Choose scoring function for RCD loop scoring (none will avoid scoring altogether)
 	loop_score = args.loop_score
 
-	# - rigid_receptor : Disable sampling of receptor DoFs in the flex_res.txt
+	# - rigid_receptor : Disable sampling of receptor DoFs in the ./helper_files/flex_res.txt
 	doReceptorMinimization = not args.rigid_receptor
 
 	# - Debug: Print extra information?
