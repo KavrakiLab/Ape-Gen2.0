@@ -2,7 +2,6 @@ name: apegen
 channels:
   - conda-forge
   - salilab
-  - schrodinger
   - bioconda
 dependencies:
   - python=3.7
@@ -10,7 +9,7 @@ dependencies:
   - numpy
   - openmm
   - modeller 
-  - pymol
+  - pymol-open-source
   - biopandas
   - biopython
   - mgltools
