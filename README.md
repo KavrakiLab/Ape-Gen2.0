@@ -46,3 +46,22 @@ python New_APE-Gen.py LLGpSGpSLTV HLA-A*02:01 --verbose --score_with_openmm
 ```
 
 Please contact the team should you have any issues with running APE-Gen2.0!
+
+## Citation
+
+```
+@article{Fasoulis2024,
+  title = {APE-Gen2.0: Expanding Rapid Class I Peptide–Major Histocompatibility Complex Modeling to Post-Translational Modifications and Noncanonical Peptide Geometries},
+  volume = {64},
+  ISSN = {1549-960X},
+  url = {http://dx.doi.org/10.1021/acs.jcim.3c01667},
+  DOI = {10.1021/acs.jcim.3c01667},
+  number = {5},
+  journal = {Journal of Chemical Information and Modeling},
+  publisher = {American Chemical Society (ACS)},
+  author = {Fasoulis,  Romanos and Rigo,  Mauricio M. and Lizée,  Gregory and Antunes,  Dinler A. and Kavraki,  Lydia E.},
+  year = {2024},
+  month = feb,
+  pages = {1730–1750}
+}
+```
