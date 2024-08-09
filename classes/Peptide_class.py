@@ -85,7 +85,7 @@ class Peptide(object):
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
 		sequence_length = len(self.sequence)
-		templates = pd.read_csv("./helper_files/Reduced_files/Template_DB_reduced.csv") # Fetch template info
+		templates = pd.read_csv("./helper_files/Proper_files/Template_DB.csv") # Fetch template info
 
 		# removes pdb code of peptide in order to cross validate (just for testing)
 		if cv != '': templates = templates[~templates['pdb_code'].str.contains(cv, case=False)]
