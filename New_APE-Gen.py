@@ -426,7 +426,7 @@ def apegen(args):
 		create_csv_from_list_of_files(filestore + '/5_openMM_conformations/total_results.csv', glob.glob(filestore + '/5_openMM_conformations/05_per_peptide_results/*.log'))
 		results_csv = pretty_print_analytics(filestore + '/5_openMM_conformations/total_results.csv', verbose=verbose)
 		results_csv.to_csv(filestore + '/5_openMM_conformations/successful_conformations_statistics.csv', index=False)
-
+		results_csv.to_csv(temp_files_storage + '/successful_conformations_statistics.csv', index=False)	
 	else:
 		initialize_dir(filestore + '/5_final_conformations/')
 		copy_batch_of_files(filestore + '/4_SMINA_data/10_pMHC_complexes/',
