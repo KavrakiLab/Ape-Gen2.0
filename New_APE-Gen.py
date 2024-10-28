@@ -237,6 +237,9 @@ def apegen(args):
 	# --similarity_threshold: Score [0-1] that defines if a peptide template will be considered as a candidate during the modelling process.
 	similarity_threshold = args.similarity_threshold
 
+	# Option for anchor identification: Either PMBEC or MHCflurry motifs
+	use_motifs = args.use_motifs
+
 	# --keep_all_files: Keep all intermediate generated files from the modeling process
 	keep_all_files = args.keep_all_files
 
@@ -275,7 +278,7 @@ def apegen(args):
 	receptor.useSMINA = min_with_smina
 	
 	# Peptide Template and Receptor Template are pMHC complexes	
-	peptide_templates, anchors, anchor_status = peptide.get_peptide_templates(receptor.allotype, anchors, max_no_templates, similarity_threshold, cv)
+	peptide_templates, anchors, anchor_status = peptide.get_peptide_templates(receptor.allotype, anchors, max_no_templates, similarity_threshold, use_motifs, cv)
 	if peptide_templates.empty:
 		print("No available peptides for the given peptide-MHC input! Aborting...")
 		sys.exit(0)

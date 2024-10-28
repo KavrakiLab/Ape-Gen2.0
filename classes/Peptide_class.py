@@ -80,7 +80,7 @@ class Peptide(object):
 			       primary_anchors=primary_anchors, secondary_anchors=secondary_anchors, 
 			       tilted_sequence=tilted_sequence, index=peptide_index)
 
-	def get_peptide_templates(self, receptor_allotype, anchors, max_no_templates, similarity_threshold, cv=''):
+	def get_peptide_templates(self, receptor_allotype, anchors, max_no_templates, similarity_threshold, use_motifs, cv=''):
 
 		if verbose(): print("\nProcessing Peptide Input: " + self.sequence)
 
@@ -94,8 +94,8 @@ class Peptide(object):
 		# 1) Feature filtering to predict which are the anchors (when they are not given)
 		anchor_status = "Not Known"
 		if anchors == "":	
-			if verbose(): print("Determining anchors for given peptide sequence and allele allotype")
-			anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype)
+			if verbose(): print("Determining anchors for given peptide sequence and allele allotype" + str(use_motifs))
+			anchors, anchor_status = predict_anchors_PMBEC(self.sequence, receptor_allotype, use_motifs)
 			if verbose():
 				if anchor_status == "Not Known":
 					print("SMM matrices could NOT be used... Defaulting to peptide sequence alignment")

@@ -22,10 +22,11 @@ def APE_Gen_parser():
 	parser.add_argument("--dir", type=str, default='intermediate_files', help='Location for all the intermediate files')
 	parser.add_argument("--anchor_selection", type=str, default='secondary', choices=['primary', 'secondary', 'none'], help="Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)")
 	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
-	parser.add_argument("--loop_score", type=str, default='ICOSA', choices=['RMSD', 'KORP', 'ICOSA', 'none'], help='Choose scoring function for RCD loop scoring (none will avoid scoring altogether)')
+	parser.add_argument("--loop_score", type=str, default='RMSD', choices=['RMSD', 'KORP', 'ICOSA', 'none'], help='Choose scoring function for RCD loop scoring (none will avoid scoring altogether)')
 	parser.add_argument("--sampling_ratio", type=float, default=0.8, help='The percentage of overall peptide conformations processed (defined by --num_loops_for_optimization flag) that will be coming from RCD sampling.')
 	parser.add_argument("--similarity_threshold", type=float, default=1, help='Score [0-1] that defines if a peptide template will be considered as a candidate during the modelling process.')
 	parser.add_argument("--max_no_templates", type=int, default=5, help='The maximum number of templates that will be used in the modelling process.')
 	parser.add_argument("--no_constraints_openmm", action="store_true", help='Do not apply constraints on the backbone when applying openMM')
 	parser.add_argument("--keep_all_files", action="store_true", help='Keep all intermediate generated files from the modeling process')
+	parser.add_argument("--use_motifs", action="store_true", help='Choose between PMBEC matrices and peptide motifs for the anchor identification process.')
 	return parser
