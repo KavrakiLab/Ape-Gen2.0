@@ -1,5 +1,7 @@
-FROM ubuntu:bionic
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
+ENV HOME="/root"
+ENV LD_LIBRARY_PATH="/usr/local/lib"
 
 # The following line is important for singularity
 #RUN mkdir /scratch /work /home1 /gpfs /corral-repl /corral-tacc /data
@@ -7,37 +9,48 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
     apt-get -y install \
         cmake \
-        cython \
+        # cython \
+        cython3 \
         doxygen \
         freeglut3-dev \
         git \
         gfortran \
-        libboost-date-time1.62-dev \
-        libboost-filesystem1.62-dev \
-        libboost-iostreams1.62-dev \
-        libboost-program-options1.62-dev \
-        libboost-serialization1.62-dev \
-        libboost-system1.62-dev \
-        libboost-thread1.62-dev \
-        libboost-timer1.62-dev \
+        # libboost-date-time1.62-dev \
+        # libboost-filesystem1.62-dev \
+        # libboost-iostreams1.62-dev \
+        # libboost-program-options1.62-dev \
+        # libboost-serialization1.62-dev \
+        # libboost-system1.62-dev \
+        # libboost-thread1.62-dev \
+        # libboost-timer1.62-dev \
+        libboost-all-dev \
         libeigen3-dev \
         libfftw3-dev \
         libfreetype6-dev \
         libglew-dev \
         libglm-dev \
         libpng-dev \
-        libpython-dev \
+        # libpython-dev \
+        libpython3-dev \
         libxml2-dev \
-        python-pip \
-        python-pmw \
+        # python-pip \
+        python3-pip \
+        # python-pmw \
         swig \
         wget \
         vim
 
-RUN ["/bin/bash", "-c", "wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge-pypy3-Linux-x86_64.sh"]
-RUN chmod 0755 Miniforge-pypy3-Linux-x86_64.sh
-RUN bash Miniforge-pypy3-Linux-x86_64.sh -b -p /mamba
-ENV PATH "/mamba/bin:$PATH"
+# RUN ["/bin/bash", "-c", "wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge-pypy3-Linux-x86_64.sh"]
+# RUN chmod 0755 Miniforge-pypy3-Linux-x86_64.sh
+# RUN bash Miniforge-pypy3-Linux-x86_64.sh -b -p /mamba
+# ENV PATH "/mamba/bin:$PATH"
+
+# pypy3 is deprecated
+RUN wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+RUN chmod 0755 Miniforge3-Linux-x86_64.sh
+RUN bash Miniforge3-Linux-x86_64.sh -b -p /mamba
+ENV PATH="/mamba/bin:$PATH"
+
 
 # environment.yml has pdbfixer, numpy, mdtraj and openmm
 COPY ./Docker_image/environment.yml /environment.yml
@@ -64,9 +77,21 @@ ADD . $HOME/data/
 # RUN echo "sh /replace_files.sh" >> ~/.bashrc
 
 # RCD
-RUN mamba install -c intel mkl # This is here, libraries are missing if I leave it in the .yml
+# RUN mamba install -c intel mkl # This is here, libraries are missing if I leave it in the .yml
+RUN mamba install -y -c conda-forge mkl
+
 ENV LD_LIBRARY_PATH "$LD_LIBRARY_PATH:/mamba/lib/"
-RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
+# RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/rcd/rcd-download|grep txz|grep uk-button| cut -f4 -d\"` | tar Jxf - && \
+#     cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin && \
+#     cp RCD_v1.40_Linux_20190228/dunbrack.bin /data/RCD_required_files/dunbrack.bin
+
+RUN set -e && \
+    mkdir -p /data/RCD_required_files && \
+    echo "Fetching RCD download URL..." && \
+    RCD_PATH=$(wget -qO- http://chaconlab.org/modeling/rcd/rcd-download | grep txz | grep uk-button | cut -f4 -d'"' | sed 's/&amp;/\&/g') && \
+    RCD_URL="http://chaconlab.org${RCD_PATH}" && \
+    echo "Downloading from $RCD_URL" && \
+    wget -qO- "$RCD_URL" | tar Jxf - && \
     cp RCD_v1.40_Linux_20190228/bin/rcd /usr/local/bin && \
     cp RCD_v1.40_Linux_20190228/dunbrack.bin /data/RCD_required_files/dunbrack.bin
 
@@ -77,8 +102,8 @@ RUN wget -qO- http://chaconlab.org`wget -qO- http://chaconlab.org/modeling/korp/
 
 # Change dir
 WORKDIR /data
-
-RUN cp ./helper_scripts/prepare_ligand4.py /mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/ # Functional
+COPY ./helper_scripts/prepare_ligand4.py /tmp/prepare_ligand4.py
+RUN cp /tmp/prepare_ligand4.py /mamba/envs/apegen/MGLToolsPckgs/AutoDockTools/Utilities24/ # Functional
 RUN grep -rl 'simtk.openmm' /mamba/ | xargs sed -i 's/simtk.openmm/openmm/g' # Avoiding warnings when importing
 
 ENTRYPOINT ["bash"]
