@@ -1,1 +1,1 @@
-docker build -t kavrakilab/apegen2.0:latest -f ./Docker_image/Dockerfile .
+docker build -t kavrakilab/apegen2.0:rc1 -f ./Docker_image/Dockerfile .
