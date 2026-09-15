@@ -3,8 +3,9 @@ import argparse
 def APE_Gen_parser():
 
 	parser = argparse.ArgumentParser(description="Anchored Peptide-MHC Ensemble Generator", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-	parser.add_argument('peptide_input', type=str, nargs=1, help='Sequence of peptide to dock or pdbfile of crystal structure')
-	parser.add_argument('receptor_class', type=str, nargs=1, help='Class descriptor of MHC receptor. Use REDOCK along with crystal input to perform redocking. Or pass a PDB file with receptor')
+	parser.add_argument('peptide_input', type=str, nargs='?', default=None, help='Sequence of peptide to dock or pdbfile of crystal structure. Omit when using --list.')
+	parser.add_argument('receptor_class', type=str, nargs='?', default=None, help='Class descriptor of MHC receptor. Use REDOCK along with crystal input to perform redocking. Or pass a PDB file with receptor. Omit when using --list.')
+	parser.add_argument('--list', type=str, default=None, help='CSV file for batch modelling of multiple pMHC targets, with an "allele" column and a "peptide" column (header names, case-insensitive). Each row is modelled into its own subdirectory under --dir. Cannot be combined with peptide_input/receptor_class.')
 	parser.add_argument("-n", "--num_cores", type=int, default=8, help='Number of cores to use for RCD and smina computations.')
 	parser.add_argument("--num_generated_loops", type=int, default=5000, help='Number of loops to generate with RCD')
 	parser.add_argument("--num_loops_for_optimization", type=int, default=100, help='Number of loops to optimize (that will pass as a result of a loop scoring function)')
@@ -19,7 +20,7 @@ def APE_Gen_parser():
 	parser.add_argument("-s", "--min_with_smina", action="store_true", help='Minimize with SMINA instead of the default Vinardo')
 	parser.add_argument("--use_gpu", action="store_true", help='Use GPU for OpenMM Minimization step')
 	parser.add_argument("--clean_rcd", action="store_true", help='Remove RCD folder at the end of each round')
-	parser.add_argument("--dir", type=str, default='intermediate_files', help='Location for all the intermediate files')
+	parser.add_argument("--dir", type=str, default=None, help='Location for all the intermediate files. If omitted: in single-target mode, defaults to intermediate_files/<allele>_<peptide> so consecutive runs do not overwrite each other; with --list, it is the base directory (default intermediate_files) under which each target gets its own subdirectory.')
 	parser.add_argument("--anchor_selection", type=str, default='secondary', choices=['primary', 'secondary', 'none'], help="Give what type of anchors should be considered in the anchor tolerance step (choose 'primary', 'secondary' or 'none' to skip the anchor tolerance step altogether)")
 	parser.add_argument("--cv", type=str, default='', help='ONLY FOR TESTING (to be removed in the final version)')
 	parser.add_argument("--loop_score", type=str, default='RMSD', choices=['RMSD', 'KORP', 'ICOSA', 'none'], help='Choose scoring function for RCD loop scoring (none will avoid scoring altogether)')
