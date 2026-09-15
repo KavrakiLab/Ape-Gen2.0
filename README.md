@@ -55,10 +55,10 @@ HLA-B*07:02,RPHERNGFTVL
 ```
 
 ```
-python New_APE-Gen.py --list list.csv --dir intermediate_files/batch_output --verbose --score_with_openmm
+python New_APE-Gen.py --list list.csv --verbose --score_with_openmm
 ```
 
-Each row is modeled into its own subdirectory of `--dir`, named `<allele>_<peptide>` (with characters such as `*`/`:` replaced by `_`). A `batch_summary.csv` is written to `--dir` once the batch finishes, reporting the status (`SUCCESS`, `NO_CONFORMATIONS` or `FAILED`) and output folder of each target. A failure on one target does not stop the rest of the batch.
+Each row is modeled into its own subdirectory inside the intermediate_files folder, named `<allele>_<peptide>` (with characters such as `*`/`:` replaced by `_`). A `batch_summary.csv` is written once the batch finishes, reporting the status (`SUCCESS`, `NO_CONFORMATIONS` or `FAILED`) and output folder of each target. A failure on one target does not stop the rest of the batch.
 
 Please contact the team should you have any issues with running APE-Gen2.0!
 
