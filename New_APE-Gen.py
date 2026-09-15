@@ -16,7 +16,9 @@ import pandas as pd
 import numpy as np
 import re
 
+import os
 import sys
+import subprocess
 from mpire import WorkerPool
 from tqdm import tqdm
 
@@ -161,19 +163,12 @@ def backbone_sampling(template_index, peptide_templates, receptor_template, pept
 	# Done! (6. Return also the anchor information for each template, it will come in handy later on)
 	return (template_index, peptide_template.set_anchor_xyz(anchor_selection, peptide))
 
-def apegen(args):
-	print("Start of APE-Gen")
+def sanitize_for_dirname(name):
+	# Replace anything that is not alphanumeric/./_/- with '_', so alleles like "HLA-A*02:01"
+	# turn into filesystem-safe directory names on any platform.
+	return re.sub(r'[^A-Za-z0-9._-]', '_', str(name).strip())
 
-	# 0. ARGUMENTS:
-
-	parser = argparser.APE_Gen_parser()
-	args = parser.parse_args()
-
-	# - peptide_input: Crystal structure OR sequence
-	peptide_input = args.peptide_input[0]
-
-	# - receptor_class: .pdb OR sequence OR if peptide_input is crystal structure, REDOCK!
-	receptor_class = args.receptor_class[0]
+def apegen_single(args, peptide_input, receptor_class, temp_files_storage):
 
 	# - Number of cores
 	num_cores = int(args.num_cores)
@@ -247,7 +242,6 @@ def apegen(args):
 	cv = args.cv
 
 	# Directory to store intermediate files
-	temp_files_storage = args.dir
 	initialize_dir(temp_files_storage)
 
 	# 1. INPUT PROCESSING
@@ -300,58 +294,62 @@ def apegen(args):
 	anchor_filtering_data_dict = {}
 	filestore = temp_files_storage + "/results/"
 	
-	# 2. BACKBONE SAMPLING LOOP
-	arg_list = list(map(lambda template_index: (template_index, peptide_templates, receptor_template, peptide, anchors, anchor_status, anchor_selection, rcd_num_loops, RCD_dist_tol, filestore), 
-						list(range(peptide_templates.shape[0]))))
-	with WorkerPool(n_jobs=num_cores) as pool:
+	# WorkerPool is created once and reused for both the backbone sampling and the peptide
+	# refinement/scoring loops below: with start_method='spawn', each pool creation pays the
+	# cost of re-importing the heavy native libraries (MODELLER, PyMOL, OpenMM...) in every
+	# worker, so sharing one pool across both loops halves that overhead for this run.
+	with WorkerPool(n_jobs=num_cores, start_method='spawn') as pool:
+
+		# 2. BACKBONE SAMPLING LOOP
+		arg_list = list(map(lambda template_index: (template_index, peptide_templates, receptor_template, peptide, anchors, anchor_status, anchor_selection, rcd_num_loops, RCD_dist_tol, filestore),
+							list(range(peptide_templates.shape[0]))))
 		anchor_results = pool.map(backbone_sampling, arg_list, progress_bar=verbose)
 
-	# 3. LOOP SCORING LOOP
-	if verbose: print("Scoring the sampled loops...")
-	loop_index_list = []
-	new_index_list = []
-	template_index_list = []
-	num_loops_list = split_to_equal_parts(num_loops, peptide_templates.shape[0])
-	non_sampled_confs_list = split_to_equal_parts(non_sampled_confs, peptide_templates.shape[0])
-	anchor_filtering_data_dict = {}
+		# 3. LOOP SCORING LOOP
+		if verbose: print("Scoring the sampled loops...")
+		loop_index_list = []
+		new_index_list = []
+		template_index_list = []
+		num_loops_list = split_to_equal_parts(num_loops, peptide_templates.shape[0])
+		non_sampled_confs_list = split_to_equal_parts(non_sampled_confs, peptide_templates.shape[0])
+		anchor_filtering_data_dict = {}
 
-	for template_index in range(peptide_templates.shape[0]):
-		
-		# Extract anchor information from mpire process
-		anchor_info = anchor_results[template_index]
-		anchor_filtering_data_dict[anchor_info[0]] = (anchor_info[1][0], anchor_info[1][1])
+		for template_index in range(peptide_templates.shape[0]):
 
-		# Rank the loops and make indexes intepretable (template index + loop index)
-		loop_indexes = receptor_template.loop_ranking(rcd_num_loops, num_loops_list[template_index], loop_score, non_sampled_confs_list[template_index], filestore, template_index)
-		no_of_conformations = num_loops_list[template_index] + non_sampled_confs_list[template_index]
-		new_indexes = [str(template_index) + str(i).zfill(len(str(no_of_conformations))) for i in range(non_sampled_confs_list[template_index], no_of_conformations)]
-		new_indexes = new_indexes + [str(template_index) + str(i).zfill(len(str(no_of_conformations))) for i in range(0, non_sampled_confs_list[template_index])]
-		loop_index_list += loop_indexes
-		new_index_list += new_indexes
-		template_index_list += [template_index]*no_of_conformations
+			# Extract anchor information from mpire process
+			anchor_info = anchor_results[template_index]
+			anchor_filtering_data_dict[anchor_info[0]] = (anchor_info[1][0], anchor_info[1][1])
 
-	# 4. PEPTIDE REFINEMENT AND SCORING LOOP
-	subdir_list = ['/01_assembled_peptides', '/05_per_peptide_results', '/03_PTMed_peptides',
-				   '/02_add_sidechains', '/04_pdbqt_peptides', '/06_scoring_results', '/07_flexible_receptors',
-				   '/09_minimized_receptors', '/08_anchor_filtering', '/10_pMHC_complexes/']
-	initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
+			# Rank the loops and make indexes intepretable (template index + loop index)
+			loop_indexes = receptor_template.loop_ranking(rcd_num_loops, num_loops_list[template_index], loop_score, non_sampled_confs_list[template_index], filestore, template_index)
+			no_of_conformations = num_loops_list[template_index] + non_sampled_confs_list[template_index]
+			new_indexes = [str(template_index) + str(i).zfill(len(str(no_of_conformations))) for i in range(non_sampled_confs_list[template_index], no_of_conformations)]
+			new_indexes = new_indexes + [str(template_index) + str(i).zfill(len(str(no_of_conformations))) for i in range(0, non_sampled_confs_list[template_index])]
+			loop_index_list += loop_indexes
+			new_index_list += new_indexes
+			template_index_list += [template_index]*no_of_conformations
 
-	if verbose: print("Preparing receptor sans peptide for scoring (generate receptor.pdbqt)")
-	receptor_template.remove_peptide(filestore + "/4_SMINA_data")
-	receptor = receptor_template.receptor
-	add_sidechains(receptor.pdb_filename, filestore, keep_IDs=True)
-	receptor_is_not_valid = receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
-	if(receptor_is_not_valid):
-		print("There is something wrong with the receptor file... Check the logs! Aborting...")
-		sys.exit(0)
-	
-	if verbose: print("Performing peptide refinement and scoring. This may take a while...")
-	arg_list = []
-	for i, pep_index in enumerate(loop_index_list):
-		arg_list.append((pep_index, template_index_list[i], new_index_list[i], rcd_num_loops, peptide, filestore, 
-						receptor, anchor_filtering_data_dict[template_index_list[i]][1], 
-						anchor_filtering_data_dict[template_index_list[i]][0], anchor_tol))
-	with WorkerPool(n_jobs=num_cores) as pool:
+		# 4. PEPTIDE REFINEMENT AND SCORING LOOP
+		subdir_list = ['/01_assembled_peptides', '/05_per_peptide_results', '/03_PTMed_peptides',
+					   '/02_add_sidechains', '/04_pdbqt_peptides', '/06_scoring_results', '/07_flexible_receptors',
+					   '/09_minimized_receptors', '/08_anchor_filtering', '/10_pMHC_complexes/']
+		initialize_dir([filestore + '/4_SMINA_data' + subdir for subdir in subdir_list])
+
+		if verbose: print("Preparing receptor sans peptide for scoring (generate receptor.pdbqt)")
+		receptor_template.remove_peptide(filestore + "/4_SMINA_data")
+		receptor = receptor_template.receptor
+		add_sidechains(receptor.pdb_filename, filestore, keep_IDs=True)
+		receptor_is_not_valid = receptor.prepare_for_scoring(filestore + "/4_SMINA_data")
+		if(receptor_is_not_valid):
+			print("There is something wrong with the receptor file... Check the logs! Aborting...")
+			sys.exit(0)
+
+		if verbose: print("Performing peptide refinement and scoring. This may take a while...")
+		arg_list = []
+		for i, pep_index in enumerate(loop_index_list):
+			arg_list.append((pep_index, template_index_list[i], new_index_list[i], rcd_num_loops, peptide, filestore,
+							receptor, anchor_filtering_data_dict[template_index_list[i]][1],
+							anchor_filtering_data_dict[template_index_list[i]][0], anchor_tol))
 		results = pool.map(peptide_refinement_and_scoring, arg_list, progress_bar=verbose)
 
 	# Code for non-parallel execution and debugging
@@ -383,41 +381,43 @@ def apegen(args):
 		successful_confs = results_csv['Peptide index'].tolist()
 		if verbose: print("Preparing input for OpenMM optimization. This may take a while...")
 
-		# First prepare for OpenMM
-		arg_list = list(map(lambda e: (e, filestore, peptide), successful_confs))
-		with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
+		# Single pool reused for both the OpenMM prep and the rescoring loop below, for the
+		# same reason as the main pipeline pool: avoids paying the spawn re-import cost twice.
+		with WorkerPool(n_jobs=min(num_cores, len(successful_confs)), start_method='spawn') as pool:
+
+			# First prepare for OpenMM
+			arg_list = list(map(lambda e: (e, filestore, peptide), successful_confs))
 			results = pool.map(prepare_for_openmm, arg_list, progress_bar=verbose)
 
-		# Actual minimization step
-		if verbose:
-			print("\nMinimizing energy...")
-			if no_constraints_openmm: print("Removing backbone constraints from energy minimization!")
-			disable_progress_bar = False
-			leave_progress_bar = False
-		else:
-			disable_progress_bar = True
-			leave_progress_bar = True
+			# Actual minimization step
+			if verbose:
+				print("\nMinimizing energy...")
+				if no_constraints_openmm: print("Removing backbone constraints from energy minimization!")
+				disable_progress_bar = False
+				leave_progress_bar = False
+			else:
+				disable_progress_bar = True
+				leave_progress_bar = True
 
-		for conf_index in tqdm(successful_confs, desc="pMHC conf", position=0, disable=disable_progress_bar):
+			for conf_index in tqdm(successful_confs, desc="pMHC conf", position=0, disable=disable_progress_bar):
 
-			numTries = 1
-			best_energy = float("inf")
-			pMHC_complex = pMHC(pdb_filename=filestore + "/5_openMM_conformations/13_connected_pMHC_complexes/pMHC_" + conf_index + ".pdb", 
-								peptide=peptide)
-			for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
-											leave=leave_progress_bar, disable=disable_progress_bar):
-				best_energy = pMHC_complex.minimizeConf(filestore, best_energy, no_constraints_openmm, device)
-				with open(filestore + "/5_openMM_conformations/05_per_peptide_results/peptide_" + conf_index + ".log", 'w') as peptide_handler:
-					peptide_handler.write(conf_index + ",Successfully Modeled," + str(best_energy) + "\n")
+				numTries = 1
+				best_energy = float("inf")
+				pMHC_complex = pMHC(pdb_filename=filestore + "/5_openMM_conformations/13_connected_pMHC_complexes/pMHC_" + conf_index + ".pdb",
+									peptide=peptide)
+				for minimization_effort in tqdm(range(1, numTries + 1),  desc="No. of tries", position=1,
+												leave=leave_progress_bar, disable=disable_progress_bar):
+					best_energy = pMHC_complex.minimizeConf(filestore, best_energy, no_constraints_openmm, device)
+					with open(filestore + "/5_openMM_conformations/05_per_peptide_results/peptide_" + conf_index + ".log", 'w') as peptide_handler:
+						peptide_handler.write(conf_index + ",Successfully Modeled," + str(best_energy) + "\n")
 
-		# Rescoring and re-filtering resulting conformations
-		if verbose: print("\nRescoring and re-filtering resulting conformations:")
-		#arg_list = list(map(lambda conf_index: (conf_index, filestore, rcd_num_loops, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors, min_with_smina), successful_confs))
-		arg_list = []
-		for conf_index in successful_confs:
-			arg_list.append((conf_index, filestore, rcd_num_loops, anchor_filtering_data_dict[int(conf_index[0])][0], 
-							 anchor_tol, anchor_filtering_data_dict[int(conf_index[0])][1], min_with_smina))
-		with WorkerPool(n_jobs=min(num_cores, len(successful_confs))) as pool:
+			# Rescoring and re-filtering resulting conformations
+			if verbose: print("\nRescoring and re-filtering resulting conformations:")
+			#arg_list = list(map(lambda conf_index: (conf_index, filestore, rcd_num_loops, peptide_template_anchors_xyz, anchor_tol, tolerance_anchors, min_with_smina), successful_confs))
+			arg_list = []
+			for conf_index in successful_confs:
+				arg_list.append((conf_index, filestore, rcd_num_loops, anchor_filtering_data_dict[int(conf_index[0])][0],
+								 anchor_tol, anchor_filtering_data_dict[int(conf_index[0])][1], min_with_smina))
 			results = pool.map(rescoring_after_openmm, arg_list, progress_bar=verbose)
 
 		copy_batch_of_files(filestore + '/5_openMM_conformations/10_pMHC_complexes/',
@@ -457,6 +457,111 @@ def apegen(args):
 		if(score_with_openmm and results_csv.shape[0] > 0):
 			dir_list.append('/5_openMM_conformations')
 		remove_dirs([filestore + dir for dir in dir_list])
+
+	print("\n\nEnd of APE-Gen")
+
+	return results_csv.shape[0]
+
+def strip_flag_with_value(argv, flag):
+	# Remove a '--flag value' or '--flag=value' pair from an argv list.
+	result = []
+	skip_next = False
+	for token in argv:
+		if skip_next:
+			skip_next = False
+			continue
+		if token == flag:
+			skip_next = True
+			continue
+		if token.startswith(flag + '='):
+			continue
+		result.append(token)
+	return result
+
+def apegen(args):
+	print("Start of APE-Gen")
+
+	# 0. ARGUMENTS:
+
+	raw_argv = list(args)
+
+	parser = argparser.APE_Gen_parser()
+	args = parser.parse_args()
+
+	if args.list:
+
+		if args.peptide_input or args.receptor_class:
+			sys.exit("\nERROR: --list cannot be combined with the peptide_input/receptor_class positional arguments. "
+					 "Provide either a single peptide + allele pair, or --list pointing to a CSV batch file, not both.")
+
+		batch_df = pd.read_csv(args.list)
+		batch_df.columns = [str(column).strip().lower() for column in batch_df.columns]
+		if 'allele' not in batch_df.columns or 'peptide' not in batch_df.columns:
+			sys.exit("\nERROR: --list CSV must have an 'allele' column (1st column) and a 'peptide' column (2nd column) in its header.")
+
+		base_dir = args.dir if args.dir else 'intermediate_files'
+		os.makedirs(base_dir, exist_ok=True)
+
+		# Every target is run as its own subprocess (same as calling New_APE-Gen.py by hand).
+		# APE-Gen relies on native libraries (PyMOL, MODELLER, OpenMM, mpire worker pools) that
+		# are not safe to re-run repeatedly inside one long-lived Python process, so looping
+		# in-process can hang or leak state between targets. A fresh subprocess per target avoids that.
+		script_path = os.path.abspath(__file__)
+		shared_argv = strip_flag_with_value(raw_argv, '--list')
+		shared_argv = strip_flag_with_value(shared_argv, '--dir')
+
+		summary = []
+		for i, row in batch_df.iterrows():
+			allele = str(row['allele']).strip()
+			peptide_seq = str(row['peptide']).strip()
+			target_dir = base_dir + '/' + sanitize_for_dirname(allele) + '_' + sanitize_for_dirname(peptide_seq)
+
+			print("\n\n=== [" + str(i + 1) + "/" + str(batch_df.shape[0]) + "] Modelling peptide " + peptide_seq +
+				  " with allele " + allele + " -> " + target_dir + " ===\n")
+
+			cmd = [sys.executable, script_path, peptide_seq, allele, '--dir', target_dir] + shared_argv
+			result = subprocess.run(cmd)
+
+			status, error_msg = "FAILED", ""
+			if result.returncode == 0:
+				stats_file = os.path.join(target_dir, 'successful_conformations_statistics.csv')
+				if os.path.exists(stats_file):
+					try:
+						status = "SUCCESS" if pd.read_csv(stats_file).shape[0] > 0 else "NO_CONFORMATIONS"
+					except Exception:
+						status = "SUCCESS"
+				else:
+					status = "NO_CONFORMATIONS"
+			else:
+				error_msg = "New_APE-Gen.py exited with code " + str(result.returncode)
+				print("\nWARNING: Modelling failed for " + peptide_seq + " / " + allele + ": " + error_msg)
+
+			summary.append({"allele": allele, "peptide": peptide_seq, "status": status,
+							 "output_dir": target_dir, "error": error_msg})
+
+		summary_df = pd.DataFrame(summary)
+		summary_path = base_dir + '/batch_summary.csv'
+		summary_df.to_csv(summary_path, index=False)
+
+		succeeded = int((summary_df['status'] == 'SUCCESS').sum())
+		print("\n\nBatch modelling complete: " + str(succeeded) + "/" + str(summary_df.shape[0]) +
+			  " targets produced at least one successful conformation.")
+		print("Summary written to " + summary_path)
+
+	else:
+		if not args.peptide_input or not args.receptor_class:
+			sys.exit("\nERROR: You must provide both peptide_input and receptor_class, or use --list to point to a CSV batch file.")
+
+		if args.dir:
+			target_dir = args.dir
+		else:
+			# No --dir given: isolate this target under its own subdirectory (instead of the
+			# old flat 'intermediate_files'), so running a second peptide right after doesn't
+			# wipe the first one's results.
+			target_dir = 'intermediate_files/' + sanitize_for_dirname(args.receptor_class) + '_' + sanitize_for_dirname(args.peptide_input)
+			print("No --dir given, using " + target_dir)
+
+		apegen_single(args, args.peptide_input, args.receptor_class, target_dir)
 
 	print("\n\nEnd of APE-Gen")
 
